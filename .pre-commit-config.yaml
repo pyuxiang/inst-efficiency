@@ -5,3 +5,10 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
         args: [feat, fix, perf, refactor, style, test, docs, build]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.1
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+      - id: ruff-format
