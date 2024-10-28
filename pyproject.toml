@@ -6,6 +6,9 @@ build-backend = "hatchling.build"
 name = "inst-efficiency"
 dynamic = ["version"]
 description = "Python port of 'inst_efficiency.sh' CQT script"
+authors = [
+    {author = "Justin Peh", email = "pehyuxiang@gmail.com"},
+]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -23,6 +26,9 @@ dev = [
 
 [tool.uv.sources]
 s15lib = { git = "https://github.com/s-fifteen-instruments/pyS15.git" }
+
+[project.scripts]
+inst-efficiency = "inst_efficiency.inst_efficiency:main"
 
 [tool.hatch.version]
 source = "vcs"

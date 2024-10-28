@@ -800,7 +800,7 @@ def main():
     # Request python-black linter to avoid parsing, for readability
     # fmt: off
     parser = configargparse.ArgumentParser(
-        default_config_files=["./inst_efficiency.default.conf"],
+        default_config_files=["./inst-efficiency.default.conf"],
         description="Continuous printing of timestamp statistics"
     )
 
@@ -844,7 +844,7 @@ def main():
         help="Path to timestamp device")
     parser.add_argument(
         "--readevents_path", "-S",
-        default="/home/qitlab/programs/drivers/usbtmst4/apps/readevents7",
+        default="/usr/bin/readevents7",
         help="Path to readevents binary")
     parser.add_argument(
         "--outfile_path", "-O", default="/tmp/quick_timestamp",
