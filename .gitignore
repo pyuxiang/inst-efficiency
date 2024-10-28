@@ -1,0 +1,9 @@
+# Compiled python files
+__pycache__
+.pytest_cache
+
+# IDE
+.vscode
+
+# Virtual environments
+.venv

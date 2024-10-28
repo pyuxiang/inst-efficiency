@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inst-efficiency"
+dynamic = ["version"]
+description = "Python port of 'inst_efficiency.sh' CQT script"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "colorama>=0.4.6",
+    "configargparse>=1.7",
+    "numpy>=1.24.4",
+    "s15lib",
+    "tqdm>=4.66.5",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=3.5.0",
+]
+
+[tool.uv.sources]
+s15lib = { git = "https://github.com/s-fifteen-instruments/pyS15.git" }
+
+[tool.hatch.version]
+source = "vcs"
+build.hooks.vcs.version-file = "src/inst_efficiency/__init__.py"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.custom]
+path = "scripts/build_hook.py"
