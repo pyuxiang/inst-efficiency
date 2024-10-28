@@ -368,7 +368,6 @@ def read_pairs(params, use_cache=False):
     window_size = roffset - loffset + 1
     acc_start = max(bins // 2, 1)  # location to compute accidentals
     while True:
-
         # Invoke timestamp data recording
         if not use_cache:
             timestamp._call_with_duration(["-a1", "-X"], duration=duration)
@@ -445,7 +444,6 @@ def monitor_pairs(params):
     prev = None
     longterm_data = {"count": 0, "inttime": 0, "pairs": 0, "acc": 0, "s1": 0, "s2": 0}
     while True:
-
         hist, inttime, pairs, acc, s1, s2, e1, e2, eavg = read_pairs(params)
 
         # Visualize g2 histogram
@@ -597,7 +595,6 @@ def monitor_singles(params):
     avg = np.array([0, 0, 0, 0])  # averaging facility, e.g. for measuring dark counts
     avg_iters = 0
     while True:
-
         # Invoke timestamp data recording
         data = timestamp.get_counts(
             duration=duration,
@@ -669,7 +666,6 @@ def scan_lcvr_singles(params):
 
     pbar = tqdm.tqdm(combinations)
     for combination in pbar:
-
         # Set LCVR values
         lcvr.V1, lcvr.V2, lcvr.V3, lcvr.V4 = combination
         time.sleep(0.1)
@@ -691,6 +687,7 @@ def scan_lcvr_singles(params):
             out=target,
             pbar=pbar,
         )
+
 
 def read_2pairs(params):
     """Prints out pair source statistics, between ch1 and ch4."""
@@ -717,20 +714,22 @@ def read_2pairs(params):
     _, _, p2, a2, s21, s22, *_ = read_pairs(_params, use_cache=True)
     return p1, a1, s11, s12, p2, a2, s21, s22
 
+
 @_collect_as_script("visibility")
 def print_2pairs(params):
     """Pretty printed variant of 'read_pairs', showing pairs, acc, singles."""
     p1, a1, s11, s12, p2, a2, s21, s22 = read_2pairs(params)
-    #metric = max(p1, 1) * max(p2, 1)
-    #print(round(metric, 1))
+    # metric = max(p1, 1) * max(p2, 1)
+    # print(round(metric, 1))
     print(f"{p1} {p2} {a1} {a2}")
-    #print_fixedwidth(
+    # print_fixedwidth(
     #    round(p1, 1),
     #    round(a1, 1),
     #    round(p2, 1),
     #    round(a2, 1),
     #    width=0,
-    #)
+    # )
+
 
 @_collect_as_script("2pairs")
 def monitor_2pairs(params):
@@ -738,8 +737,6 @@ def monitor_2pairs(params):
     logfile = params.get("logfile", None)
     is_header_logged = False
     i = 0
-    is_initialized = False
-    prev = None
     while True:
         p1, a1, s11, s12, p2, a2, s21, s22 = read_2pairs(params)
 
@@ -775,6 +772,7 @@ def monitor_2pairs(params):
             out=logfile,
         )
 
+
 ##########################
 #  PRE-SCRIPT EXECUTION  #
 ##########################
@@ -795,6 +793,7 @@ ARGUMENTS = [
     "channel_start",
     "channel_stop",
 ]
+
 
 def main():
     # Request python-black linter to avoid parsing, for readability
@@ -924,7 +923,6 @@ def main():
         # Request for comments
         path_logfile = None
         if args.logging:
-
             # No arguments supplied, to query user manually
             if args.logging == "unspecified":
                 path_logfile = _request_filecomment()
@@ -960,6 +958,7 @@ def main():
 
         # Call script
         PROGRAMS[args.script](params)
+
 
 if __name__ == "__main__":
     main()
