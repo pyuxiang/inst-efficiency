@@ -2,7 +2,14 @@ import subprocess
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class BuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
-        subprocess.check_output("make -C src/inst_efficiency/lib/usbtmst4/apps readevents7", shell=True)
-        subprocess.check_output("sudo cp -p src/inst_efficiency/lib/usbtmst4/apps/readevents7 /usr/bin/readevents7", shell=True)
+        BIN = "readevents7"
+        SRC = "src/inst_efficiency/lib/usbtmst4/apps"
+        TARGET = f"/usr/bin/{BIN}"
+
+        subprocess.check_output(
+            f"[ -f {TARGET} ] || {{ make -C {SRC} {BIN} && sudo cp -p {SRC}/{BIN} {TARGET}; }}",
+            shell=True,
+        )
