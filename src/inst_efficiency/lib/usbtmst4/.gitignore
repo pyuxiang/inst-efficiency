@@ -1,0 +1,14 @@
+# Application
+apps/readevents7
+
+# Kernel module and rules
+driver/.*
+driver/[M|m]odule*
+driver/usbtmst4.ko
+driver/usbtmst4.mod*
+driver/usbtmst4.o
+hotplug/62-usbtmst4.rules
+
+# Auxiliary files
+.svn
+service
