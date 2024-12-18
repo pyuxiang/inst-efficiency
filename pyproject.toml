@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling", "versioningit"]
 build-backend = "hatchling.build"
 
 [project]
@@ -31,11 +31,10 @@ s15lib = { git = "https://github.com/s-fifteen-instruments/pyS15.git" }
 inst-efficiency = "inst_efficiency.inst_efficiency:main"
 
 [tool.hatch.version]
-source = "vcs"
-build.hooks.vcs.version-file = "src/inst_efficiency/__init__.py"
+source = "versioningit"
 
-[tool.hatch.version.raw-options]
-local_scheme = "no-local-version"
+[tool.hatch.version.format]
+dirty = "v{base_version}+{build_date:%Y%m%d}"
 
 [tool.hatch.build.hooks.custom]
 path = "scripts/build_hook.py"
