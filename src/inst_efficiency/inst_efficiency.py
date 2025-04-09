@@ -99,7 +99,7 @@ import configargparse
 import numpy as np
 import tqdm
 
-from S15lib.g2lib import g2lib as g2
+import inst_efficiency.lib.g2lib as g2
 from S15lib.instruments import LCRDriver, TimestampTDC2
 
 # Constants

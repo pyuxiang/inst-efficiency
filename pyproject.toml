@@ -17,6 +17,7 @@ dependencies = [
     "numpy>=1.24.4",
     "s15lib",
     "tqdm>=4.66.5",
+    "fpfind",
 ]
 
 [dependency-groups]
@@ -26,6 +27,7 @@ dev = [
 
 [tool.uv.sources]
 s15lib = { git = "https://github.com/s-fifteen-instruments/pyS15.git" }
+fpfind = { git = "https://github.com/s-fifteen-instruments/fpfind.git" }
 
 [project.scripts]
 inst-efficiency = "inst_efficiency.inst_efficiency:main"
