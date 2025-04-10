@@ -9,16 +9,17 @@ Requires `gcc`, `make`, and uses `sudo` to write `readevents7` binary to `/usr/b
 ```bash
 git clone git+https://github.com/pyuxiang/inst-efficiency.git
 cd inst_efficiency
-
-# Build C wrapper for coincidence finding
-cd src/inst_efficiency/lib/pyS15
-cp ../compile_with_gcc.patch ./
-git apply compile_with_gcc.patch
-make
-
-# Install package
-cd -
 uv pip install .
+
+# Build C wrapper for coincidence finding (for faster coincidence finding)
+uv pip install Cython setuptools
+cd src/inst_efficiency/lib/pyS15
+git apply ../compile_w_gcc.patch
+make
+uv pip install -e .
+
+# Patch with fpfind for ignore rollover behaviour
+git apply ../S15lib_w_fpfind.patch
 ```
 
 This exposes the `inst-efficiency` tool on the command line. Some common usage:
