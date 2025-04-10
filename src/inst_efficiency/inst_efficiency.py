@@ -957,7 +957,10 @@ def main():
         params["timestamp"] = timestamp
 
         # Call script
-        PROGRAMS[args.script](params)
+        try:
+            PROGRAMS[args.script](params)
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == "__main__":

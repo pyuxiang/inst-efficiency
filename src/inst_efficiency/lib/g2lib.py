@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 
 import fpfind.lib.parse_timestamps as parser
@@ -54,6 +56,12 @@ def g2_extr(
     t, p = parser.read_a1(filename, legacy=True, ignore_rollover=True)
     t1 = t[(p & (1 << channel_start)).astype(bool)].astype(np.float64)
     t2 = t[(p & (1 << channel_stop)).astype(bool)].astype(np.float64)
+    if t1.size == 0 or t2.size == 0:
+        print(
+            f"No timestamp events recorded in channels {channel_start+1}/{channel_stop+1}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     hist = delta_loop(
         t1, t2 - min_range + c_stop_delay, bins=bins, bin_width_ns=bin_width
