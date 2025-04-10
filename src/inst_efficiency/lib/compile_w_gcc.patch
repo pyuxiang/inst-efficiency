@@ -1,0 +1,15 @@
+diff --git a/S15lib/g2lib/setup.py b/S15lib/g2lib/setup.py
+index 0f38af1..aee29ca 100644
+--- a/S15lib/g2lib/setup.py
++++ b/S15lib/g2lib/setup.py
+@@ -10,4 +10,10 @@ package = Extension(
+         ("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")
+     ],  # https://stackoverflow.com/a/64915608
+ )
++
++# Override clang with gcc
++from distutils import sysconfig
++sysconfig.get_config_vars()['CC'] = 'gcc'
++sysconfig.get_config_vars()['LDSHARED'] = 'gcc -shared'
++
+ setup(ext_modules=cythonize([package], language_level="3"))

@@ -26,7 +26,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-s15lib = { git = "https://github.com/s-fifteen-instruments/pyS15.git" }
+s15lib = { path = "./src/inst_efficiency/lib/pyS15" }
 fpfind = { git = "https://github.com/s-fifteen-instruments/fpfind.git" }
 
 [project.scripts]
