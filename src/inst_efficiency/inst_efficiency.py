@@ -404,9 +404,9 @@ def read_pairs(params, use_cache=False):
         if s1 == 0 or s2 == 0:
             e1 = e2 = eavg = 0
         else:
-            e1 = 100 * pairs / s2
-            e2 = 100 * pairs / s1
-            eavg = 100 * pairs / (s1 * s2) ** 0.5
+            e1 = max(100 * pairs / s2, 0.0)
+            e2 = max(100 * pairs / s1, 0.0)
+            eavg = max(100 * pairs / (s1 * s2) ** 0.5, 0.0)
 
         # Single datapoint collection completed
         break
@@ -521,14 +521,14 @@ def monitor_pairs(params):
         # Print statistics
         print_fixedwidth(
             style(dt.datetime.now().strftime("%H%M%S"), style="dim"),
-            round(inttime, 1),
+            f"{inttime:.2f}",
             style(int(pairs), style="bright"),
-            round(acc, 1),
+            f"{acc:.1f}",
             style(int(s1), fg="yellow", style="bright"),
             style(int(s2), fg="green", style="bright"),
-            round(e1, 1),
-            round(e2, 1),
-            style(round(eavg, 1), fg="cyan", style="bright"),
+            f"{e1:.2f}",
+            f"{e2:.2f}",
+            style(f"{eavg:.2f}", fg="cyan", style="bright"),
             out=logfile,
         )
 
@@ -552,7 +552,7 @@ def monitor_pairs(params):
                 s2 = longterm_data["s2"] / counts
                 prev = (
                     dt.datetime.now().strftime("%H%M%S"),
-                    round(inttime, 1),
+                    round(inttime, 2),
                     style(int(round(p, 0)), fg="red", style="bright"),
                     round(acc, 1),
                     int(round(s1, 0)),
