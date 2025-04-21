@@ -67,6 +67,11 @@
 #define HAS_VM_FLAG_API
 #endif
 
+/* renamed page macro */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,8,0))
+#define MAX_ORDER MAX_PAGE_ORDER
+#endif
+
 /* make vm_fault_t to int as in older kernels */
 #ifndef HAS_VM_FAULT_TYPE
 #define vm_fault_t int

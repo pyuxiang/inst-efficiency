@@ -37,6 +37,3 @@ source = "versioningit"
 
 [tool.hatch.version.format]
 dirty = "v{base_version}+{build_date:%Y%m%d}"
-
-[tool.hatch.build.hooks.custom]
-path = "scripts/build_hook.py"
