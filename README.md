@@ -7,7 +7,7 @@ Python port of 'inst_efficiency.sh' script written at CQT, for use with timestam
 Requires `gcc`, `make`, and uses `sudo` to write `readevents7` binary to `/usr/bin`.
 
 ```bash
-git clone git+https://github.com/pyuxiang/inst-efficiency.git
+git clone --recursive git+https://github.com/pyuxiang/inst-efficiency.git
 cd inst_efficiency
 uv pip install .
 
