@@ -15,19 +15,15 @@ dependencies = [
     "colorama>=0.4.6",
     "configargparse>=1.7",
     "numpy>=1.24.4",
-    "s15lib",
+    "s15lib @ {root:uri}/src/inst_efficiency/lib/pyS15",
     "tqdm>=4.66.5",
-    "fpfind",
+    "fpfind @ git+https://github.com/s-fifteen-instruments/fpfind.git",
 ]
 
 [dependency-groups]
 dev = [
     "pre-commit>=3.5.0",
 ]
-
-[tool.uv.sources]
-s15lib = { path = "./src/inst_efficiency/lib/pyS15" }
-fpfind = { git = "https://github.com/s-fifteen-instruments/fpfind.git" }
 
 [project.scripts]
 inst-efficiency = "inst_efficiency.inst_efficiency:main"
@@ -37,3 +33,6 @@ source = "versioningit"
 
 [tool.hatch.version.format]
 dirty = "v{base_version}+{build_date:%Y%m%d}"
+
+[tool.hatch.metadata]
+allow-direct-references = true
