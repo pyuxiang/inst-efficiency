@@ -806,97 +806,100 @@ def main():
     # ConfigArgParse does not support multiple configuration files for same argument
     # Workaround by adding additional argument with similar argument name to supply
     # any secondary configuration, i.e. "-c" and "-C" both supplies configuration
-    parser.add_argument(
-        "--config", "-c", is_config_file_arg=True,
-        help="Configuration file")
-    parser.add_argument(
-        "--save", is_write_out_config_file_arg=True,
-        help="Save configuration as file, and immediately exits program")
-
-    # Script-level arguments
-    parser.add_argument(
-        "--averaging", "-a", action="store_true",
-        help="Change to averaging singles mode")
-    parser.add_argument(
-        "--histogram", "-H", action="store_true",
-        help="Enable histogram in pairs mode")
-    parser.add_argument(
-        "--no-histogram", action="store_true",
-        help="Disable histogram in pairs mode. Overrides other histogram options.")
-    parser.add_argument(
-        "--logging", "-l", nargs="?", action="store", const="unspecified",
-        help="Log stuff")
-    parser.add_argument(
+    pgroup_display = parser.add_argument_group("display/configuration")
+    pgroup_display.add_argument(
         "--verbose", "-v", action="count", default=0,
         help="Specify debug verbosity")
-    parser.add_argument(
+    pgroup_display.add_argument(
+        "--logging", "-l", metavar="", nargs="?", action="store", const="unspecified",
+        help="Log stuff")
+    pgroup_display.add_argument(
         "--quiet", "-q", action="store_true",
         help="Suppress errors, does not block logging")
+    pgroup_display.add_argument(
+        "--config", "-c", metavar="", is_config_file_arg=True,
+        help="Configuration file")
+    pgroup_display.add_argument(
+        "--save", metavar="", is_write_out_config_file_arg=True,
+        help="Save configuration as file, and immediately exits program")
     parser.add_argument(
+        "--color", action="store_true",
+        help="Add preset color highlighting to text in stdout")
+
+    # Script-level arguments
+    pgroup_global = parser.add_argument_group("script-wide configuration")
+    pgroup_global.add_argument(
+        "--averaging", "-a", action="store_true",
+        help="Change to averaging singles mode")
+    pgroup_global.add_argument(
+        "--histogram", "-H", action="store_true",
+        help="Enable histogram in pairs mode")
+    pgroup_global.add_argument(
+        "--no-histogram", action="store_true",
+        help="Disable histogram in pairs mode. Overrides other histogram options.")
+    pgroup_global.add_argument(
         "script", choices=PROGRAMS,
         help="Script to run")
 
     # Device-level argument
-    parser.add_argument(
-        "--device_path", "-U", default="/dev/ioboards/usbtmst0",
+    pgroup_device = parser.add_argument_group("device configuration")
+    pgroup_device.add_argument(
+        "--device_path", "-U", metavar="", default="/dev/ioboards/usbtmst0",
         help="Path to timestamp device")
-    parser.add_argument(
-        "--readevents_path", "-S",
-        default="/usr/bin/readevents7",
+    pgroup_device.add_argument(
+        "--readevents_path", "-S", metavar="", default="/usr/bin/readevents7",
         help="Path to readevents binary")
-    parser.add_argument(
-        "--outfile_path", "-O", default="/tmp/quick_timestamp",
+    pgroup_device.add_argument(
+        "--outfile_path", "-O", metavar="", default="/tmp/quick_timestamp",
         help="Path to temporary file for timestamp storage")
-    parser.add_argument(
-        "--threshvolt", "-t", type=float, default="-0.4",
+    pgroup_device.add_argument(
+        "--threshvolt", "-t", metavar="", type=float, default="-0.4",
         help="Pulse trigger level for each detector channel, comma-delimited")
-    parser.add_argument(
+    pgroup_device.add_argument(
         "--fast", "-f", action="store_true",
         help="Enable fast event readout mode, i.e. 32-bit wide events. Only for TDC2.")
 
     # Data processing arguments
-    parser.add_argument(
-        "--bin_width", "--width", "-W", type=float, default=1,
+    pgroup_data = parser.add_argument_group("data processing")
+    pgroup_data.add_argument(
+        "--bin_width", "--width", "-W", metavar="", type=float, default=1,
         help="Size of time bin, in nanoseconds")
-    parser.add_argument(
-        "--bins", "-B", type=int, default=500,
+    pgroup_data.add_argument(
+        "--bins", "-B", metavar="", type=int, default=500,
         help="Number of coincidence bins, in units of 'bin_width'")
-    parser.add_argument(
-        "--peak", "--window-center", "-M", type=int, default=-250,
+    pgroup_data.add_argument(
+        "--peak", "--window-center", "-M", metavar="", type=int, default=-250,
         help="Absolute bin location of coincidence window, in units of 'bin_width'")
-    parser.add_argument(
-        "--window_left_offset", "--left", "-L", type=int, default=0,
+    pgroup_data.add_argument(
+        "--window_left_offset", "--left", "-L", metavar="", type=int, default=0,
         help="Left boundary of coincidence window relative to window middle")
-    parser.add_argument(
-        "--window_right_offset", "--right", "-R", type=int, default=0,
+    pgroup_data.add_argument(
+        "--window_right_offset", "--right", "-R", metavar="", type=int, default=0,
         help="Right boundary of coincidence window relative to window middle")
-    parser.add_argument(
-        "--integration_time", "--time", "-T", type=float, default=1.0,
+    pgroup_data.add_argument(
+        "--integration_time", "--time", "-T", metavar="", type=float, default=1.0,
         help="Integration time for timestamp, in seconds")
-    parser.add_argument(
-        "--averaging_time", "--atime", type=float, default=0.0,
+    pgroup_data.add_argument(
+        "--averaging_time", "--atime", metavar="", type=float, default=0.0,
         help="Auxiliary long-term integration time, in seconds")
-    parser.add_argument(
-        "--darkcount_ch1", "--ch1", "-1", type=float, default=0.0,
+    pgroup_data.add_argument(
+        "--darkcount_ch1", "--ch1", "-1", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
-    parser.add_argument(
-        "--darkcount_ch2", "--ch2", "-2", type=float, default=0.0,
+    pgroup_data.add_argument(
+        "--darkcount_ch2", "--ch2", "-2", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
-    parser.add_argument(
-        "--darkcount_ch3", "--ch3", "-3", type=float, default=0.0,
+    pgroup_data.add_argument(
+        "--darkcount_ch3", "--ch3", "-3", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
-    parser.add_argument(
-        "--darkcount_ch4", "--ch4", "-4", type=float, default=0.0,
+    pgroup_data.add_argument(
+        "--darkcount_ch4", "--ch4", "-4", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
-    parser.add_argument(
-        "--channel_start", "--start", type=int, default=1,
+    pgroup_data.add_argument(
+        "--channel_start", "--start", metavar="", type=int, default=1,
         help="Reference timestamp channel for calculating time delay offset")
-    parser.add_argument(
-        "--channel_stop", "--stop", type=int, default=4,
+    pgroup_data.add_argument(
+        "--channel_stop", "--stop", metavar="", type=int, default=4,
         help="Target timestamp channel for calculating time delay offset")
-    parser.add_argument(
-        "--color", action="store_true",
-        help="Add preset color highlighting to text in stdout")
     # Reenable python-black linter
     # fmt: on
 
