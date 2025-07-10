@@ -93,6 +93,7 @@ import pathlib
 import re
 import sys
 import time
+from copy import deepcopy
 from itertools import product
 
 import configargparse
@@ -347,21 +348,21 @@ def read_pairs(params, use_cache=False):
     """
 
     # Unpack arguments into aliases
-    bin_width = params["bin_width"]
-    bins = params["bins"]
-    peak = params["peak"]
-    roffset = params["window_right_offset"]
-    loffset = params["window_left_offset"]
-    duration = params["integration_time"]
+    bin_width = params.bin_width
+    bins = params.bins
+    peak = params.peak
+    roffset = params.window_right_offset
+    loffset = params.window_left_offset
+    duration = params.integration_time
     darkcounts = [
-        params["darkcount_ch1"],
-        params["darkcount_ch2"],
-        params["darkcount_ch3"],
-        params["darkcount_ch4"],
+        params.darkcount_ch1,
+        params.darkcount_ch2,
+        params.darkcount_ch3,
+        params.darkcount_ch4,
     ]
-    channel_start = params["channel_start"] - 1
-    channel_stop = params["channel_stop"] - 1
-    timestamp = params["timestamp"]
+    channel_start = params.channel_start - 1
+    channel_stop = params.channel_stop - 1
+    timestamp = params.timestamp
 
     darkcount_start = darkcounts[channel_start]
     darkcount_stop = darkcounts[channel_stop]
@@ -431,12 +432,12 @@ def print_pairs(params):
 def monitor_pairs(params):
     """Prints out pair source statistics, between ch1 and ch4."""
     # Unpack arguments into aliases
-    peak = params["peak"]
-    roffset = params["window_right_offset"]
-    loffset = params["window_left_offset"]
-    enable_hist = params.get("histogram", False)
-    disable_hist = params.get("no_histogram", False)
-    logfile = params.get("logfile", None)
+    peak = params.peak
+    roffset = params.window_right_offset
+    loffset = params.window_left_offset
+    enable_hist = getattr(params, "histogram", False)
+    disable_hist = getattr(params, "no_histogram", False)
+    logfile = getattr(params, "logfile", None)
 
     is_header_logged = False
     i = 0
@@ -532,7 +533,7 @@ def monitor_pairs(params):
         )
 
         # Print long-term statistics, only if value supplied
-        if params["averaging_time"] > 0:
+        if params.averaging_time > 0:
             # Update first
             longterm_data["count"] += 1
             longterm_data["inttime"] += inttime
@@ -542,7 +543,7 @@ def monitor_pairs(params):
             longterm_data["s2"] += s2
 
             # Cache long term results if reach threshold
-            if longterm_data["inttime"] >= params["averaging_time"]:
+            if longterm_data["inttime"] >= params.averaging_time:
                 counts = longterm_data["count"]
                 inttime = longterm_data["inttime"]
                 p = longterm_data["pairs"] / counts
@@ -580,14 +581,14 @@ def monitor_pairs(params):
 def monitor_singles(params):
     """Prints out singles statistics."""
     # Unpack arguments into aliases
-    duration = params["integration_time"]
-    darkcount_ch1 = params["darkcount_ch1"]
-    darkcount_ch2 = params["darkcount_ch2"]
-    darkcount_ch3 = params["darkcount_ch3"]
-    darkcount_ch4 = params["darkcount_ch4"]
-    timestamp = params["timestamp"]
-    logfile = params.get("logfile", None)
-    enable_avg = params.get("averaging", False)
+    duration = params.integration_time
+    darkcount_ch1 = params.darkcount_ch1
+    darkcount_ch2 = params.darkcount_ch2
+    darkcount_ch3 = params.darkcount_ch3
+    darkcount_ch4 = params.darkcount_ch4
+    timestamp = params.timestamp
+    logfile = getattr(params, "logfile", None)
+    enable_avg = getattr(params, "averaging", False)
 
     is_header_logged = False
     i = 0
@@ -652,7 +653,7 @@ def monitor_singles(params):
 
 @_collect_as_script("lcvr")
 def scan_lcvr_singles(params):
-    timestamp = params["timestamp"]
+    timestamp = params.timestamp
     target = dt.datetime.now().strftime("%Y%m%d_%H%M%S_lcvrsingles.log")
     lcvr = LCRDriver(
         "/dev/serial/by-id/"
@@ -706,10 +707,10 @@ def read_2pairs(params):
         "window_right_offset": 1,
     }
 
-    _params = dict(params)
-    _params.update(override1_params)
+    _params = duplicate_args(params)
+    vars(_params).update(override1_params)
     _, _, p1, a1, s11, s12, *_ = read_pairs(_params)
-    _params.update(override2_params)
+    vars(_params).update(override2_params)
     _, _, p2, a2, s21, s22, *_ = read_pairs(_params, use_cache=True)
     return p1, a1, s11, s12, p2, a2, s21, s22
 
@@ -733,7 +734,7 @@ def print_2pairs(params):
 @_collect_as_script("2pairs")
 def monitor_2pairs(params):
     """Prints out pair source statistics, between ch1 and ch4."""
-    logfile = params.get("logfile", None)
+    logfile = getattr(params, "logfile", None)
     is_header_logged = False
     i = 0
     while True:
@@ -776,22 +777,12 @@ def monitor_2pairs(params):
 #  PRE-SCRIPT EXECUTION  #
 ##########################
 
-# Enumerate data processing arguments
-ARGUMENTS = [
-    "bin_width",
-    "bins",
-    "peak",
-    "window_left_offset",
-    "window_right_offset",
-    "integration_time",
-    "averaging_time",
-    "darkcount_ch1",
-    "darkcount_ch2",
-    "darkcount_ch3",
-    "darkcount_ch4",
-    "channel_start",
-    "channel_stop",
-]
+
+def duplicate_args(args):
+    """Makes a copy of the argparse.Namespace object."""
+    attrs = vars(args)
+    attrs_copy = {k: deepcopy(v) for k, v in attrs.items()}
+    return type(args)(**attrs_copy)
 
 
 def main():
@@ -883,16 +874,16 @@ def main():
         "--averaging_time", "--atime", metavar="", type=float, default=0.0,
         help="Auxiliary long-term integration time, in seconds")
     pgroup_data.add_argument(
-        "--darkcount_ch1", "--ch1", "-1", metavar="", type=float, default=0.0,
+        "--darkcount_ch1", "--ch1", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
     pgroup_data.add_argument(
-        "--darkcount_ch2", "--ch2", "-2", metavar="", type=float, default=0.0,
+        "--darkcount_ch2", "--ch2", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
     pgroup_data.add_argument(
-        "--darkcount_ch3", "--ch3", "-3", metavar="", type=float, default=0.0,
+        "--darkcount_ch3", "--ch3", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
     pgroup_data.add_argument(
-        "--darkcount_ch4", "--ch4", "-4", metavar="", type=float, default=0.0,
+        "--darkcount_ch4", "--ch4", metavar="", type=float, default=0.0,
         help="Dark count level for detector channel 1, in counts/second")
     pgroup_data.add_argument(
         "--channel_start", "--start", metavar="", type=int, default=1,
@@ -951,16 +942,12 @@ def main():
         timestamp.fast = args.fast
 
         # Collect required arguments
-        params = dict([(k, getattr(args, k, None)) for k in ARGUMENTS])
-        params["logfile"] = path_logfile
-        params["histogram"] = args.histogram
-        params["no_histogram"] = args.no_histogram
-        params["averaging"] = args.averaging
-        params["timestamp"] = timestamp
+        args.logfile = path_logfile
+        args.timestamp = timestamp
 
         # Call script
         try:
-            PROGRAMS[args.script](params)
+            PROGRAMS[args.script](args)
         except KeyboardInterrupt:
             pass
 
