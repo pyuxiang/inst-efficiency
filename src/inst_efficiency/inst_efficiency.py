@@ -464,7 +464,8 @@ def monitor_pairs(params):
 
             # Display current window as well
             window_size = roffset - loffset + 1
-            print(f"Current window: {list(hist[1:window_size+1])}")
+            current_window = hist[1 : window_size + 1]
+            print(f"Current window: {list(map(int, current_window))}")
 
             # Display likely window
             likely_window = [peakvalue]
@@ -492,10 +493,8 @@ def monitor_pairs(params):
                 else:
                     likely_right = i - 1
                     break
-            print(
-                "Likely window: "
-                f"{list(a[likely_left+peakargmax:likely_right+1+peakargmax])}"
-            )
+            likely_window = a[likely_left + peakargmax : likely_right + 1 + peakargmax]
+            print(f"Likely window: {list(map(int, likely_window))}")
             print(
                 f"Args: --peak={peakpos} --left={likely_left} --right={likely_right}\n"
             )
