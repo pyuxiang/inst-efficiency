@@ -30,7 +30,7 @@ Examples:
     3. Search for pairs between detector channels 1 and 2, over +/-250ns,
        showing histogram of coincidences for each dataset
 
-       ./inst_efficiency.py pairs -qH --channel_start 1 --channel_stop 2
+       ./inst_efficiency.py pairs -qH --ch_start 1 --ch_stop 2
 
 
     4. Calculate total pairs located at +118ns delay, within a 2ns-wide
@@ -150,20 +150,20 @@ def read_pairs(params, use_cache=False):
     """
 
     # Unpack arguments into aliases
-    bin_width = params.bin_width
+    bin_width = params.width
     bins = params.bins
     peak = params.peak
-    roffset = params.window_right_offset
-    loffset = params.window_left_offset
+    roffset = params.right
+    loffset = params.left
     duration = params.time
     darkcounts = [
-        params.darkcount_ch1,
-        params.darkcount_ch2,
-        params.darkcount_ch3,
-        params.darkcount_ch4,
+        params.darkcount1,
+        params.darkcount2,
+        params.darkcount3,
+        params.darkcount4,
     ]
-    channel_start = params.channel_start - 1
-    channel_stop = params.channel_stop - 1
+    channel_start = params.ch_start - 1
+    channel_stop = params.ch_stop - 1
     timestamp = params.timestamp
 
     darkcount_start = darkcounts[channel_start]
@@ -177,7 +177,7 @@ def read_pairs(params, use_cache=False):
 
         # Extract g2 histogram and other data
         data = g2.g2_extr(
-            params.outfile_path,
+            params.tmpfile,
             channel_start=channel_start,
             channel_stop=channel_stop,
             highres_tscard=True,
@@ -203,6 +203,11 @@ def read_pairs(params, use_cache=False):
         s2 = s2 / inttime - darkcount_stop
         pairs = pairs / inttime
         acc = acc / inttime
+        if params.accumulate:
+            s1 = s1 * inttime
+            s2 = s2 * inttime
+            pairs = pairs * inttime
+            acc = acc * inttime
 
         if s1 == 0 or s2 == 0:
             e1 = e2 = eavg = 0
@@ -232,8 +237,8 @@ def monitor_pairs(params):
     """Prints out pair source statistics, between ch1 and ch4."""
     # Unpack arguments into aliases
     peak = params.peak
-    roffset = params.window_right_offset
-    loffset = params.window_left_offset
+    roffset = params.right
+    loffset = params.left
     hist_verbosity = params.histogram
     logfile = params.logging
 
@@ -325,7 +330,7 @@ def monitor_pairs(params):
         )
 
         # Print long-term statistics, only if value supplied
-        if params.averaging_time > 0:
+        if params.avgtime > 0:
             # Update first
             longterm_data["count"] += 1
             longterm_data["inttime"] += inttime
@@ -335,7 +340,7 @@ def monitor_pairs(params):
             longterm_data["s2"] += s2
 
             # Cache long term results if reach threshold
-            if longterm_data["inttime"] >= params.averaging_time:
+            if longterm_data["inttime"] >= params.avgtime:
                 counts = longterm_data["count"]
                 inttime = longterm_data["inttime"]
                 p = longterm_data["pairs"] / counts
@@ -392,7 +397,7 @@ def monitor_singles(params):
             counts = counts * inttime
 
         # Implement rolling average to avoid overflow
-        if params.averaging:
+        if params.average:
             avg_iters += 1
             avg = (avg_iters - 1) / avg_iters * avg + np.array(counts) / avg_iters
             counts = np.round(avg, 1)
@@ -421,18 +426,18 @@ def read_2pairs(params):
     """Prints out pair source statistics, between ch1 and ch4."""
     # Hardcoded hohoho
     override1_params = {
-        "channel_start": 1,
-        "channel_stop": 2,
+        "ch_start": 1,
+        "ch_stop": 2,
         "peak": 219,
-        "window_left_offset": -1,
-        "window_right_offset": 1,
+        "left": -1,
+        "right": 1,
     }
     override2_params = {
-        "channel_start": 3,
-        "channel_stop": 4,
+        "ch_start": 3,
+        "ch_stop": 4,
         "peak": 190,
-        "window_left_offset": -1,
-        "window_right_offset": 1,
+        "left": -1,
+        "right": 1,
     }
 
     _params = duplicate_args(params)
@@ -507,101 +512,102 @@ def main():
         parser, default_config = kochen.scriptutil.generate_default_parser_config(__doc__, display_config=help_verbosity >= 2)
 
         # Boilerplate
-        pgroup_display = parser.add_argument_group("display/configuration")
-        pgroup_display.add_argument(
+        pgroup = parser.add_argument_group("display/configuration")
+        pgroup.add_argument(
             "-h", "--help", action="count", default=0,
             help="Show this help message, with incremental verbosity, e.g. -hh")
-        pgroup_display.add_argument(
+        pgroup.add_argument(
             "-v", "--verbosity", action="count", default=0,
-            help="Specify debug verbosity, e.g. -vv for more verbosity")
-        pgroup_display.add_argument(
+            help=adv("Specify debug verbosity, e.g. -vv for more verbosity"))
+        pgroup.add_argument(
             "-L", "--logging", metavar="",
             help="Log to file, if specified. Log level follows verbosity.")
-        pgroup_display.add_argument(
+        pgroup.add_argument(
             "-q", "--quiet", action="store_true",
             help=adv("Suppress errors, does not block logging"))
-        pgroup_display.add_argument(
+        pgroup.add_argument(
             "-c", "--config", metavar="", is_config_file_arg=True,
             help=f"Path to configuration file (default: '{default_config}')")
-        pgroup_display.add_argument(
+        pgroup.add_argument(
             "--save", metavar="", is_write_out_config_file_arg=True,
             help=adv("Path to configuration file for saving, then immediately exit"))
-        pgroup_display.add_argument(
+        pgroup.add_argument(
             "--no-color", action="store_true",
             help=adv("Disable color highlighting for stdout text"))
 
-        # Script-level arguments
-        pgroup_global = parser.add_argument_group("script-specific configuration")
-        pgroup_global.add_argument(
-            "script", choices=PROGRAMS)
-        pgroup_global.add_argument(
-            "-a", "--averaging", action="store_true",
-            help=adv("Change to averaging singles mode"))
-        pgroup_global.add_argument(
-            "--accumulate", action="store_true",
-            help=adv("[singles] Print raw singles, without normalizing counts to s^-1"))
-        pgroup_global.add_argument(
-            "-H", "--histogram", action="count", default=0,
-            help="[pairs] Enable histogram (-HH for continuous histogram)")
-        pgroup_global.add_argument(
-            "--averaging_time", "--atime", metavar="", type=float, default=0.0,
-            help=adv("[pairs] Auxiliary long-term integration time, in seconds"))
-
         # Device-level argument
-        pgroup_device = parser.add_argument_group("device configuration")
-        pgroup_device.add_argument(
-            "-U", "--device_path", metavar="", default="/dev/ioboards/usbtmst0",
-            help="Path to timestamp device")
-        pgroup_device.add_argument(
-            "-S", "--readevents_path", metavar="", default="/usr/bin/readevents7",
-            help="Path to readevents binary")
-        pgroup_device.add_argument(
-            "-O", "--outfile_path", metavar="", default="/tmp/quick_timestamp",
-            help=adv("Path to temporary file for timestamp storage"))
-        pgroup_device.add_argument(
+        pgroup = parser.add_argument_group("device configuration")
+        pgroup.add_argument(
+            "-U", "--device", metavar="", default="/dev/ioboards/usbtmst0",
+            help="Path to timestamp device (default: '/dev/ioboards/usbtmst0')")
+        pgroup.add_argument(
+            "-S", "--readevents", metavar="", default="/usr/bin/readevents7",
+            help=adv("Path to readevents binary (default: '/usr/bin/readevents7')"))
+        pgroup.add_argument(
+            "-O", "--tmpfile", metavar="", default="/tmp/quick_timestamp",
+            help=adv("Path to temporary file for timestamp storage (default: '/tmp/quick_timestamp')"))
+        pgroup.add_argument(
             "-t", "--threshvolt", metavar="", type=float, default="-0.4",
-            help="Pulse trigger level for each detector channel, comma-delimited")
-        pgroup_device.add_argument(
+            help="Pulse trigger level for each detector channel, comma-delimited (default: -0.4)")
+        pgroup.add_argument(
             "-f", "--fast", action="store_true",
-            help="Enable fast event readout mode, i.e. 32-bit wide events. Only for TDC2.")
+            help="[TDC2] Enable fast event readout mode, i.e. 32-bit wide events.")
 
-        # Data processing arguments
-        pgroup_data = parser.add_argument_group("data processing")
-        pgroup_data.add_argument(
-            "-W", "--bin_width", "--width", metavar="", type=float, default=1,
-            help="Size of time bin, in nanoseconds")
-        pgroup_data.add_argument(
-            "-B", "--bins", metavar="", type=int, default=500,
-            help="Number of coincidence bins, in units of 'bin_width'")
-        pgroup_data.add_argument(
-            "--peak", "--window-center", metavar="", type=int, default=-250,
-            help="Absolute bin location of coincidence window, in units of 'bin_width'")
-        pgroup_data.add_argument(
-            "--window_left_offset", "--left", metavar="", type=int, default=0,
-            help="Left boundary of coincidence window relative to window middle")
-        pgroup_data.add_argument(
-            "--window_right_offset", "--right", metavar="", type=int, default=0,
-            help="Right boundary of coincidence window relative to window middle")
-        pgroup_data.add_argument(
+        # Script-level arguments
+        pgroup = parser.add_argument_group("global configuration")
+        pgroup.add_argument(
+            "script", choices=PROGRAMS)
+        pgroup.add_argument(
             "-T", "--time", metavar="", type=float, default=1.0,
-            help="Integration time for timestamp, in seconds")
-        pgroup_data.add_argument(
-            "--darkcount_ch1", "--ch1", metavar="", type=float, default=0.0,
-            help=adv("Dark count level for detector channel 1, in counts/second"))
-        pgroup_data.add_argument(
-            "--darkcount_ch2", "--ch2", metavar="", type=float, default=0.0,
-            help=adv("Dark count level for detector channel 1, in counts/second"))
-        pgroup_data.add_argument(
-            "--darkcount_ch3", "--ch3", metavar="", type=float, default=0.0,
-            help=adv("Dark count level for detector channel 1, in counts/second"))
-        pgroup_data.add_argument(
-            "--darkcount_ch4", "--ch4", metavar="", type=float, default=0.0,
-            help=adv("Dark count level for detector channel 1, in counts/second"))
-        pgroup_data.add_argument(
-            "--channel_start", "--start", metavar="", type=int, default=1,
+            help="Integration time for timestamp, in s (default: 1.0)")
+        pgroup.add_argument(
+            "--accumulate", action="store_true",
+            help=adv("Print raw counts, without normalizing to counts/s"))
+        pgroup.add_argument(
+            "--darkcount1", "--dc1", metavar="", type=float, default=0.0,
+            help=adv("Dark-count level for channel 1, in counts/s"))
+        pgroup.add_argument(
+            "--darkcount2", "--dc2", metavar="", type=float, default=0.0,
+            help=adv("Dark-count level for channel 2, in counts/s"))
+        pgroup.add_argument(
+            "--darkcount3", "--dc3", metavar="", type=float, default=0.0,
+            help=adv("Dark-count level for channel 3, in counts/s"))
+        pgroup.add_argument(
+            "--darkcount4", "--dc4", metavar="", type=float, default=0.0,
+            help=adv("Dark-count level for channel 4, in counts/s"))
+
+        pgroup = parser.add_argument_group("[singles] options")
+        pgroup.add_argument(
+            "--average", action="store_true",
+            help=adv("Print long-term average singles instead"))
+
+        pgroup = parser.add_argument_group("[pairs] options")
+        pgroup.add_argument(
+            "-H", "--histogram", action="count", default=0,
+            help="Enable histogram, e.g. '-HH' for continuous histogram")
+        pgroup.add_argument(
+            "-W", "--width", metavar="", type=float, default=1,
+            help="Width of coincidence time bins, in ns")
+        pgroup.add_argument(
+            "-B", "--bins", metavar="", type=int, default=500,
+            help="Number of coincidence time bins, in units of 'width'")
+        pgroup.add_argument(
+            "--peak", metavar="", type=int, default=-250,
+            help="Absolute bin position of coincidence window, in units of 'width'")
+        pgroup.add_argument(
+            "--left", metavar="", type=int, default=0,
+            help="Left offset of coincidence window relative to peak")
+        pgroup.add_argument(
+            "--right", metavar="", type=int, default=0,
+            help="Right offset of coincidence window relative to peak")
+        pgroup.add_argument(
+            "--avgtime", metavar="", type=float, default=0.0,
+            help=adv("Auxiliary long-term integration time, in seconds"))
+        pgroup.add_argument(
+            "--ch_start", "--start", metavar="", type=int, default=1,
             help=adv("Reference timestamp channel for calculating time delay offset"))
-        pgroup_data.add_argument(
-            "--channel_stop", "--stop", metavar="", type=int, default=4,
+        pgroup.add_argument(
+            "--ch_stop", "--stop", metavar="", type=int, default=4,
             help=adv("Target timestamp channel for calculating time delay offset"))
 
         return parser
@@ -625,9 +631,9 @@ def main():
 
     # Initialize timestamp
     timestamp = TimestampTDC2(
-        device_path=args.device_path,
-        readevents_path=args.readevents_path,
-        outfile_path=args.outfile_path,
+        device_path=args.device,
+        readevents_path=args.readevents,
+        outfile_path=args.tmpfile,
     )
     timestamp.threshold = args.threshvolt
     timestamp.fast = args.fast
@@ -636,10 +642,10 @@ def main():
     args.timestamp = timestamp
     args.darkcounts = np.array(
         [
-            args.darkcount_ch1,
-            args.darkcount_ch2,
-            args.darkcount_ch3,
-            args.darkcount_ch4,
+            args.darkcount1,
+            args.darkcount2,
+            args.darkcount3,
+            args.darkcount4,
         ]
     )
 
