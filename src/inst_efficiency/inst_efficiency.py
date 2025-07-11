@@ -5,13 +5,13 @@ Python port of 'inst_efficiency.sh' functionality written in CQT.
 Supports reading of singles, pairs, and other miscellaneous features.
 Interface via CLI only, to avoid unnecessary GUI dependencies.
 
-Supports usage of 'inst_efficiency.py' both as a script,
-as well as an importable library for specific function usage, e.g. 'read_log'.
+By default, the start and stop channels are set as channels 1 and 4.
+This can be configured in advanced options - see advanced help with '-hh'.
 
-Configuration files can be supplied according to parser specification, which
-can be viewed by supplying the '--help' flag.
+Changelog:
+    2022-12-01, Justin: Initial code
 
-Usage:
+Examples:
 
     1. View available configuration options
 
@@ -62,33 +62,9 @@ Usage:
 
        # Output yields 'bins=10', 'peak=118', 'integration_time=3'
        ./inst_efficiency.py pairs -c asympair --time 3
-
-
-Author:
-    Justin, 2022-12-01
-
-Note:
-    Configuration specification follows the philosophy of ConfigArgParse[1].
-    Previous idea to use extensible sections (via overriding of profiles),
-    but its utility typically only applies up to three layers, in increasing
-    precedence, i.e.
-
-        1. Default (platform-specific, e.g. TTL inputs)
-        2. Profile (setup-specific, e.g. specific delays)
-        3. Sub-profile (setup-specific variations, e.g. longer integration)
-
-    This can be mapped into the respective ConfigArgParse input methods:
-
-        1. Default configuration file (i.e. 'inst_efficiency.py.default.conf')
-        2. Specified configuration file (via '--config' option)
-        3. Command line arguments, with highest precedence
-
-References:
-    [1] https://github.com/bw2/ConfigArgParse
 """
 
 import datetime as dt
-import logging
 import pathlib
 import re
 import sys
@@ -96,12 +72,15 @@ import time
 from copy import deepcopy
 from itertools import product
 
-import configargparse
 import numpy as np
 import tqdm
 
 import inst_efficiency.lib.g2lib as g2
+import kochen.scriptutil
+import kochen.logging
 from S15lib.instruments import LCRDriver, TimestampTDC2
+
+logger = kochen.logging.get_logger(__name__)
 
 # Constants
 INT_MIN = np.iinfo(np.int64).min  # indicate invalid value in int64 array
@@ -786,170 +765,160 @@ def duplicate_args(args):
 
 
 def main():
-    # Request python-black linter to avoid parsing, for readability
     # fmt: off
-    parser = configargparse.ArgumentParser(
-        default_config_files=["./inst-efficiency.default.conf"],
-        description="Continuous printing of timestamp statistics"
-    )
+    def make_parser(help_verbosity: int = 1):
+        adv = kochen.scriptutil.get_help_descriptor(help_verbosity >= 2)
+        parser = kochen.scriptutil.generate_default_parser(__doc__, display_config=help_verbosity >= 2)
 
-    # Parser-level arguments
-    # ConfigArgParse does not support multiple configuration files for same argument
-    # Workaround by adding additional argument with similar argument name to supply
-    # any secondary configuration, i.e. "-c" and "-C" both supplies configuration
-    pgroup_display = parser.add_argument_group("display/configuration")
-    pgroup_display.add_argument(
-        "--verbose", "-v", action="count", default=0,
-        help="Specify debug verbosity")
-    pgroup_display.add_argument(
-        "--logging", "-l", metavar="", nargs="?", action="store", const="unspecified",
-        help="Log stuff")
-    pgroup_display.add_argument(
-        "--quiet", "-q", action="store_true",
-        help="Suppress errors, does not block logging")
-    pgroup_display.add_argument(
-        "--config", "-c", metavar="", is_config_file_arg=True,
-        help="Configuration file")
-    pgroup_display.add_argument(
-        "--save", metavar="", is_write_out_config_file_arg=True,
-        help="Save configuration as file, and immediately exits program")
-    parser.add_argument(
-        "--color", action="store_true",
-        help="Add preset color highlighting to text in stdout")
+        # Boilerplate
+        pgroup_display = parser.add_argument_group("display/configuration")
+        pgroup_display.add_argument(
+            "-h", "--help", action="count", default=0,
+            help="Show this help message, with incremental verbosity, e.g. -hh")
+        pgroup_display.add_argument(
+            "-v", "--verbosity", action="count", default=0,
+            help="Specify debug verbosity, e.g. -vv for more verbosity")
+        pgroup_display.add_argument(
+            "-L", "--logging", nargs="?", action="store", const="unspecified",
+            help="Log to file, if specified. Log level follows verbosit.")
+        pgroup_display.add_argument(
+            "-q", "--quiet", action="store_true",
+            help=adv("Suppress errors, does not block logging"))
+        pgroup_display.add_argument(
+            "-c", "--config", metavar="", is_config_file_arg=True,
+            help="Path to configuration file")
+        pgroup_display.add_argument(
+            "--save", metavar="", is_write_out_config_file_arg=True,
+            help=adv("Path to configuration file for saving, then immediately exit"))
+        pgroup_display.add_argument(
+            "--color", action="store_true",
+            help=adv("Add preset color highlighting to text in stdout"))
 
-    # Script-level arguments
-    pgroup_global = parser.add_argument_group("script-wide configuration")
-    pgroup_global.add_argument(
-        "--averaging", "-a", action="store_true",
-        help="Change to averaging singles mode")
-    pgroup_global.add_argument(
-        "--histogram", "-H", action="store_true",
-        help="Enable histogram in pairs mode")
-    pgroup_global.add_argument(
-        "--no-histogram", action="store_true",
-        help="Disable histogram in pairs mode. Overrides other histogram options.")
-    pgroup_global.add_argument(
-        "script", choices=PROGRAMS,
-        help="Script to run")
+        # Script-level arguments
+        pgroup_global = parser.add_argument_group("script-wide configuration")
+        pgroup_global.add_argument(
+            "script", choices=PROGRAMS)
+        pgroup_global.add_argument(
+            "-a", "--averaging", action="store_true",
+            help=adv("Change to averaging singles mode"))
+        pgroup_global.add_argument(
+            "-H", "--histogram", action="store_true",
+            help="Enable histogram in pairs mode")
+        pgroup_global.add_argument(
+            "--no-histogram", action="store_true",
+            help="Disable histogram in pairs mode. Overrides other histogram options.")
 
-    # Device-level argument
-    pgroup_device = parser.add_argument_group("device configuration")
-    pgroup_device.add_argument(
-        "--device_path", "-U", metavar="", default="/dev/ioboards/usbtmst0",
-        help="Path to timestamp device")
-    pgroup_device.add_argument(
-        "--readevents_path", "-S", metavar="", default="/usr/bin/readevents7",
-        help="Path to readevents binary")
-    pgroup_device.add_argument(
-        "--outfile_path", "-O", metavar="", default="/tmp/quick_timestamp",
-        help="Path to temporary file for timestamp storage")
-    pgroup_device.add_argument(
-        "--threshvolt", "-t", metavar="", type=float, default="-0.4",
-        help="Pulse trigger level for each detector channel, comma-delimited")
-    pgroup_device.add_argument(
-        "--fast", "-f", action="store_true",
-        help="Enable fast event readout mode, i.e. 32-bit wide events. Only for TDC2.")
 
-    # Data processing arguments
-    pgroup_data = parser.add_argument_group("data processing")
-    pgroup_data.add_argument(
-        "--bin_width", "--width", "-W", metavar="", type=float, default=1,
-        help="Size of time bin, in nanoseconds")
-    pgroup_data.add_argument(
-        "--bins", "-B", metavar="", type=int, default=500,
-        help="Number of coincidence bins, in units of 'bin_width'")
-    pgroup_data.add_argument(
-        "--peak", "--window-center", "-M", metavar="", type=int, default=-250,
-        help="Absolute bin location of coincidence window, in units of 'bin_width'")
-    pgroup_data.add_argument(
-        "--window_left_offset", "--left", "-L", metavar="", type=int, default=0,
-        help="Left boundary of coincidence window relative to window middle")
-    pgroup_data.add_argument(
-        "--window_right_offset", "--right", "-R", metavar="", type=int, default=0,
-        help="Right boundary of coincidence window relative to window middle")
-    pgroup_data.add_argument(
-        "--integration_time", "--time", "-T", metavar="", type=float, default=1.0,
-        help="Integration time for timestamp, in seconds")
-    pgroup_data.add_argument(
-        "--averaging_time", "--atime", metavar="", type=float, default=0.0,
-        help="Auxiliary long-term integration time, in seconds")
-    pgroup_data.add_argument(
-        "--darkcount_ch1", "--ch1", metavar="", type=float, default=0.0,
-        help="Dark count level for detector channel 1, in counts/second")
-    pgroup_data.add_argument(
-        "--darkcount_ch2", "--ch2", metavar="", type=float, default=0.0,
-        help="Dark count level for detector channel 1, in counts/second")
-    pgroup_data.add_argument(
-        "--darkcount_ch3", "--ch3", metavar="", type=float, default=0.0,
-        help="Dark count level for detector channel 1, in counts/second")
-    pgroup_data.add_argument(
-        "--darkcount_ch4", "--ch4", metavar="", type=float, default=0.0,
-        help="Dark count level for detector channel 1, in counts/second")
-    pgroup_data.add_argument(
-        "--channel_start", "--start", metavar="", type=int, default=1,
-        help="Reference timestamp channel for calculating time delay offset")
-    pgroup_data.add_argument(
-        "--channel_stop", "--stop", metavar="", type=int, default=4,
-        help="Target timestamp channel for calculating time delay offset")
-    # Reenable python-black linter
+        # Device-level argument
+        pgroup_device = parser.add_argument_group("device configuration")
+        pgroup_device.add_argument(
+            "-U", "--device_path", metavar="", default="/dev/ioboards/usbtmst0",
+            help="Path to timestamp device")
+        pgroup_device.add_argument(
+            "-S", "--readevents_path", metavar="", default="/usr/bin/readevents7",
+            help="Path to readevents binary")
+        pgroup_device.add_argument(
+            "-O", "--outfile_path", metavar="", default="/tmp/quick_timestamp",
+            help=adv("Path to temporary file for timestamp storage"))
+        pgroup_device.add_argument(
+            "-t", "--threshvolt", metavar="", type=float, default="-0.4",
+            help="Pulse trigger level for each detector channel, comma-delimited")
+        pgroup_device.add_argument(
+            "-f", "--fast", action="store_true",
+            help="Enable fast event readout mode, i.e. 32-bit wide events. Only for TDC2.")
+
+        # Data processing arguments
+        pgroup_data = parser.add_argument_group("data processing")
+        pgroup_data.add_argument(
+            "-W", "--bin_width", "--width", metavar="", type=float, default=1,
+            help="Size of time bin, in nanoseconds")
+        pgroup_data.add_argument(
+            "-B", "--bins", metavar="", type=int, default=500,
+            help="Number of coincidence bins, in units of 'bin_width'")
+        pgroup_data.add_argument(
+            "--peak", "--window-center", metavar="", type=int, default=-250,
+            help="Absolute bin location of coincidence window, in units of 'bin_width'")
+        pgroup_data.add_argument(
+            "--window_left_offset", "--left", metavar="", type=int, default=0,
+            help="Left boundary of coincidence window relative to window middle")
+        pgroup_data.add_argument(
+            "--window_right_offset", "--right", metavar="", type=int, default=0,
+            help="Right boundary of coincidence window relative to window middle")
+        pgroup_data.add_argument(
+            "-T", "--integration_time", "--time", metavar="", type=float, default=1.0,
+            help="Integration time for timestamp, in seconds")
+        pgroup_data.add_argument(
+            "--averaging_time", "--atime", metavar="", type=float, default=0.0,
+            help=adv("Auxiliary long-term integration time, in seconds"))
+        pgroup_data.add_argument(
+            "--darkcount_ch1", "--ch1", metavar="", type=float, default=0.0,
+            help=adv("Dark count level for detector channel 1, in counts/second"))
+        pgroup_data.add_argument(
+            "--darkcount_ch2", "--ch2", metavar="", type=float, default=0.0,
+            help=adv("Dark count level for detector channel 1, in counts/second"))
+        pgroup_data.add_argument(
+            "--darkcount_ch3", "--ch3", metavar="", type=float, default=0.0,
+            help=adv("Dark count level for detector channel 1, in counts/second"))
+        pgroup_data.add_argument(
+            "--darkcount_ch4", "--ch4", metavar="", type=float, default=0.0,
+            help=adv("Dark count level for detector channel 1, in counts/second"))
+        pgroup_data.add_argument(
+            "--channel_start", "--start", metavar="", type=int, default=1,
+            help=adv("Reference timestamp channel for calculating time delay offset"))
+        pgroup_data.add_argument(
+            "--channel_stop", "--stop", metavar="", type=int, default=4,
+            help=adv("Target timestamp channel for calculating time delay offset"))
+
+        return parser
     # fmt: on
 
-    # Do script only if arguments supplied
-    # otherwise run as a normal script (for interactive mode)
-    if len(sys.argv) > 1:
-        args = parser.parse_args()
+    # Parse arguments and configure logging
+    parser = make_parser()
+    args = kochen.scriptutil.parse_args_or_help(parser, parser_func=make_parser)
+    kwargs = {}
+    if args.quiet:
+        kwargs["stream"] = None
+    kochen.logging.set_default_handlers(logger, file=args.logging, **kwargs)
+    kochen.logging.set_logging_level(logger, args.verbosity)
+    logger.debug("%s", args)
 
-        # Set program logging verbosity
-        levels = [
-            logging.CRITICAL,
-            logging.WARNING,
-            logging.INFO,
-            logging.DEBUG,
-        ]
-        logging.basicConfig(
-            level=levels[min(args.verbose, 3)],
-            format="{asctime} {levelname}: {message}",
-            style="{",
-        )
-        logging.debug("Arguments: %s", args)
+    # Request for comments
+    path_logfile = None
+    if args.logging:
+        # No arguments supplied, to query user manually
+        if args.logging == "unspecified":
+            path_logfile = _request_filecomment()
 
-        # Request for comments
-        path_logfile = None
-        if args.logging:
-            # No arguments supplied, to query user manually
-            if args.logging == "unspecified":
-                path_logfile = _request_filecomment()
+        # Comment for logfile supplied, use that
+        else:
+            path_logfile = _append_datetime_logfile(args.logging)
 
-            # Comment for logfile supplied, use that
-            else:
-                path_logfile = _append_datetime_logfile(args.logging)
+    # Silence all errors/tracebacks
+    if args.quiet:
+        sys.excepthook = lambda etype, e, tb: print()
 
-        # Silence all errors/tracebacks
-        if args.quiet:
-            sys.excepthook = lambda etype, e, tb: print()
+    # Disable color if not explicitly enabled
+    if not args.color or not COLORAMA_IMPORTED:
+        style = lambda text, *args, **kwargs: text  # noqa
 
-        # Disable color if not explicitly enabled
-        if not args.color or not COLORAMA_IMPORTED:
-            style = lambda text, *args, **kwargs: text  # noqa
+    # Initialize timestamp
+    timestamp = TimestampTDC2(
+        device_path=args.device_path,
+        readevents_path=args.readevents_path,
+        outfile_path=args.outfile_path,
+    )
+    timestamp.threshold = args.threshvolt
+    timestamp.fast = args.fast
 
-        # Initialize timestamp
-        timestamp = TimestampTDC2(
-            device_path=args.device_path,
-            readevents_path=args.readevents_path,
-            outfile_path=args.outfile_path,
-        )
-        timestamp.threshold = args.threshvolt
-        timestamp.fast = args.fast
+    # Collect required arguments
+    args.logfile = path_logfile
+    args.timestamp = timestamp
 
-        # Collect required arguments
-        args.logfile = path_logfile
-        args.timestamp = timestamp
-
-        # Call script
-        try:
-            PROGRAMS[args.script](args)
-        except KeyboardInterrupt:
-            pass
+    # Call script
+    try:
+        PROGRAMS[args.script](args)
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
