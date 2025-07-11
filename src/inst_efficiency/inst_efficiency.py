@@ -583,7 +583,7 @@ def main():
     # fmt: off
     def make_parser(help_verbosity: int = 1):
         adv = kochen.scriptutil.get_help_descriptor(help_verbosity >= 2)
-        parser = kochen.scriptutil.generate_default_parser(__doc__, display_config=help_verbosity >= 2)
+        parser, default_config = kochen.scriptutil.generate_default_parser_config(__doc__, display_config=help_verbosity >= 2)
 
         # Boilerplate
         pgroup_display = parser.add_argument_group("display/configuration")
@@ -595,13 +595,13 @@ def main():
             help="Specify debug verbosity, e.g. -vv for more verbosity")
         pgroup_display.add_argument(
             "-L", "--logging", metavar="",
-            help="Log to file, if specified. Log level follows verbosit.")
+            help="Log to file, if specified. Log level follows verbosity.")
         pgroup_display.add_argument(
             "-q", "--quiet", action="store_true",
             help=adv("Suppress errors, does not block logging"))
         pgroup_display.add_argument(
             "-c", "--config", metavar="", is_config_file_arg=True,
-            help="Path to configuration file")
+            help=f"Path to configuration file (default: '{default_config}')")
         pgroup_display.add_argument(
             "--save", metavar="", is_write_out_config_file_arg=True,
             help=adv("Path to configuration file for saving, then immediately exit"))
