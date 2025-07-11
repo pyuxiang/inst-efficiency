@@ -67,17 +67,14 @@ Examples:
 import datetime as dt
 import re
 import sys
-import time
 from copy import deepcopy
-from itertools import product
 
 import numpy as np
-import tqdm
 
 import inst_efficiency.lib.g2lib as g2
 import kochen.scriptutil
 import kochen.logging
-from S15lib.instruments import LCRDriver, TimestampTDC2
+from S15lib.instruments import TimestampTDC2
 
 logger = kochen.logging.get_logger(__name__)
 
@@ -452,13 +449,7 @@ def monitor_singles(params):
     """Prints out singles statistics."""
     # Unpack arguments into aliases
     duration = params.integration_time
-    darkcount_ch1 = params.darkcount_ch1
-    darkcount_ch2 = params.darkcount_ch2
-    darkcount_ch3 = params.darkcount_ch3
-    darkcount_ch4 = params.darkcount_ch4
-    timestamp = params.timestamp
     logfile = params.logging
-    enable_avg = getattr(params, "averaging", False)
 
     is_header_logged = False
     i = 0
@@ -466,33 +457,24 @@ def monitor_singles(params):
     avg_iters = 0
     while True:
         # Invoke timestamp data recording
-        data = timestamp.get_counts(
+        data = params.timestamp.get_counts(
             duration=duration,
             return_actual_duration=True,
         )
-        counts = data[:4]
+        counts = np.array(data[:4])
         inttime = data[4]
 
         # Rough integration time check
         if not (0.75 < inttime / duration < 2):
             continue
-        if any(np.array(counts) < 0):
+        if any(counts < 0):
             continue
-
-        counts = (
-            counts[0] - darkcount_ch1 * inttime,
-            counts[1] - darkcount_ch2 * inttime,
-            counts[2] - darkcount_ch3 * inttime,
-            counts[3] - darkcount_ch4 * inttime,
-        )
-        counts = np.array(counts)
-        # VAHD
-        # counts = counts/ np.array([1,1.057,0.788,0.631])
-        # VDHA
-        # counts = counts/ np.array([1,0.631,0.788,1.057])
+        counts = counts / inttime - params.darkcounts
+        if params.accumulate:
+            counts = counts * inttime
 
         # Implement rolling average to avoid overflow
-        if enable_avg:
+        if params.averaging:
             avg_iters += 1
             avg = (avg_iters - 1) / avg_iters * avg + np.array(counts) / avg_iters
             counts = np.round(avg, 1)
@@ -501,61 +483,19 @@ def monitor_singles(params):
         if i == 0:
             i = 10
             print_fixedwidth(
-                "TIME",
-                "CH1",
-                "CH2",
-                "CH3",
-                "CH4",
-                "TOTAL",
+                "TIME", "INTTIME", "CH1", "CH2", "CH3", "CH4", "TOTAL",
                 out=logfile if not is_header_logged else None,
-            )
+            )  # fmt: skip
             is_header_logged = True
         i -= 1
 
         # Print statistics
         print_fixedwidth(
             style(dt.datetime.now().strftime("%H%M%S"), style="dim"),
+            f"{inttime:.2f}",
             *list(map(int, counts)),
             style(int(sum(counts)), style="bright"),
             out=logfile,
-        )
-
-
-@_collect_as_script("lcvr")
-def scan_lcvr_singles(params):
-    timestamp = params.timestamp
-    target = dt.datetime.now().strftime("%Y%m%d_%H%M%S_lcvrsingles.log")
-    lcvr = LCRDriver(
-        "/dev/serial/by-id/"
-        "usb-Centre_for_Quantum_Technologies_Quad_LCD_driver_QLC-QO05-if00"
-    )
-    lcvr.all_channels_on()
-
-    voltages = np.round(np.linspace(0.9, 5.5, 9), 3)
-    combinations = product(voltages, repeat=4)
-
-    pbar = tqdm.tqdm(combinations)
-    for combination in pbar:
-        # Set LCVR values
-        lcvr.V1, lcvr.V2, lcvr.V3, lcvr.V4 = combination
-        time.sleep(0.1)
-
-        # Invoke timestamp data recording
-        counts = timestamp.get_counts()
-        counts = (
-            counts[0],
-            counts[1],
-            counts[2],
-            counts[3],
-        )
-
-        # Print statistics
-        print_fixedwidth(
-            dt.datetime.now().strftime("%H%M%S"),
-            *combination,
-            *counts,
-            out=target,
-            pbar=pbar,
         )
 
 
@@ -589,16 +529,7 @@ def read_2pairs(params):
 def print_2pairs(params):
     """Pretty printed variant of 'read_pairs', showing pairs, acc, singles."""
     p1, a1, s11, s12, p2, a2, s21, s22 = read_2pairs(params)
-    # metric = max(p1, 1) * max(p2, 1)
-    # print(round(metric, 1))
     print(f"{p1} {p2} {a1} {a2}")
-    # print_fixedwidth(
-    #    round(p1, 1),
-    #    round(a1, 1),
-    #    round(p2, 1),
-    #    round(a2, 1),
-    #    width=0,
-    # )
 
 
 @_collect_as_script("2pairs")
@@ -615,16 +546,10 @@ def monitor_2pairs(params):
             i = 10
             print_fixedwidth(
                 "TIME",
-                "P1",
-                "A1",
-                "S11",
-                "S12",
-                "P2",
-                "A2",
-                "S21",
-                "S22",
+                "P1", "A1", "S11", "S12",
+                "P2", "A2", "S21", "S22",
                 out=logfile if not is_header_logged else None,
-            )
+            )  # fmt: skip
             is_header_logged = True
         i -= 1
 
@@ -692,6 +617,9 @@ def main():
         pgroup_global.add_argument(
             "-a", "--averaging", action="store_true",
             help=adv("Change to averaging singles mode"))
+        pgroup_global.add_argument(
+            "--accumulate", action="store_true",
+            help=adv("[singles] Print raw singles, without normalizing counts to s^-1"))
         pgroup_global.add_argument(
             "-H", "--histogram", action="store_true",
             help="Enable histogram in pairs mode")
@@ -791,6 +719,14 @@ def main():
 
     # Collect required arguments
     args.timestamp = timestamp
+    args.darkcounts = np.array(
+        [
+            args.darkcount_ch1,
+            args.darkcount_ch2,
+            args.darkcount_ch3,
+            args.darkcount_ch4,
+        ]
+    )
 
     # Call script
     try:
