@@ -33,7 +33,9 @@ inst-efficiency = "inst_efficiency.inst_efficiency:main"
 source = "versioningit"
 
 [tool.hatch.version.format]
-dirty = "v{base_version}+{build_date:%Y%m%d}"
+distance = "v{base_version}"
+dirty = "v{base_version}"
+distance-dirty = "v{base_version}"
 
 [tool.hatch.metadata]
 allow-direct-references = true
