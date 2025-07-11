@@ -302,8 +302,7 @@ def monitor_pairs(params):
     peak = params.peak
     roffset = params.window_right_offset
     loffset = params.window_left_offset
-    enable_hist = getattr(params, "histogram", False)
-    disable_hist = getattr(params, "no_histogram", False)
+    hist_verbosity = params.histogram
     logfile = params.logging
 
     is_header_logged = False
@@ -316,12 +315,12 @@ def monitor_pairs(params):
 
         # Visualize g2 histogram
         HIST_ROWSIZE = 10
-        if not is_initialized or enable_hist:
+        if hist_verbosity > 1 or (hist_verbosity == 1 and not is_initialized):
             is_initialized = True
             a = np.array(hist, dtype=np.int64)
             # Append NaN values until fits number of rows
             a = np.append(a, np.resize(INT_MIN, HIST_ROWSIZE - (a.size % HIST_ROWSIZE)))
-            if not disable_hist:
+            if hist_verbosity > 0:
                 print("\nObtained histogram:")
                 for row in a.reshape(-1, HIST_ROWSIZE):
                     print_fixedwidth(*row)
@@ -368,7 +367,7 @@ def monitor_pairs(params):
             )
 
         # Print the header line after every 10 lines
-        if i == 0 or enable_hist:
+        if i == 0 or hist_verbosity > 1:
             i = 10
             print_fixedwidth(
                 "TIME",
@@ -621,11 +620,8 @@ def main():
             "--accumulate", action="store_true",
             help=adv("[singles] Print raw singles, without normalizing counts to s^-1"))
         pgroup_global.add_argument(
-            "-H", "--histogram", action="store_true",
-            help="Enable histogram in pairs mode")
-        pgroup_global.add_argument(
-            "--no-histogram", action="store_true",
-            help="Disable histogram in pairs mode. Overrides other histogram options.")
+            "-H", "--histogram", action="count", default=0,
+            help="[pairs] Enable histogram (-HH for continuous histogram)")
 
         # Device-level argument
         pgroup_device = parser.add_argument_group("device configuration")
