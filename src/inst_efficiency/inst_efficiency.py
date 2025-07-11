@@ -65,87 +65,22 @@ Examples:
 """
 
 import datetime as dt
-import re
 import sys
 from copy import deepcopy
 
 import numpy as np
+from S15lib.instruments import TimestampTDC2
 
-import inst_efficiency.lib.g2lib as g2
 import kochen.scriptutil
 import kochen.logging
-from S15lib.instruments import TimestampTDC2
+
+import inst_efficiency.lib.g2lib as g2
+from inst_efficiency.lib.color import nostyle as style, get_style, len_ansi, strip_ansi
 
 logger = kochen.logging.get_logger(__name__)
 
 # Constants
 INT_MIN = np.iinfo(np.int64).min  # indicate invalid value in int64 array
-RE_ANSIESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-
-# Colorama
-COLORAMA_IMPORTED = False
-try:
-    import colorama
-
-    COLORAMA_IMPORTED = True
-    try:
-        colorama.just_fix_windows_console()
-        COLORAMA_INIT = False
-    except AttributeError:
-        colorama.init()
-        COLORAMA_INIT = True
-except ModuleNotFoundError:
-    pass  # colorama does not exist, disable coloring
-
-
-def style(text, fg=None, bg=None, style=None, clear=False, up=0):
-    """Returns text with ANSI wrappers for each line.
-
-    Special note on newlines, where lines are broken up to apply
-    formatting on individual lines, excluding the newline character.
-
-    Position of start of print can be controlled using the 'up' arg.
-
-    Usage:
-        >>> print(s("hello\nworld", fg="red", style="dim"))
-        hello
-        world
-    """
-    # Construct formatting
-    fmt = ""
-    for c, cls in zip((fg, bg), (colorama.Fore, colorama.Back)):
-        if c:
-            c = c.upper()
-            if c.startswith("LIGHT"):
-                c += "_EX"
-            fmt += getattr(cls, c)
-    if style:
-        fmt += getattr(colorama.Style, style.upper())
-
-    # Force clear lines
-    if clear:
-        fmt = colorama.ansi.clear_line() + fmt
-
-    # Break by individual lines to apply formatting
-    lines = str(text).split("\n")
-    lines = [f"{fmt}{line}{colorama.Style.RESET_ALL}" for line in lines]
-    text = "\n".join(lines)
-
-    # Apply move and restore position
-    # Assuming Cursor.DOWN will stop at bottom of current terminal printing
-    # Non-positive numbers are treated strangely.
-    if up > 0:
-        text = colorama.Cursor.UP(up) + text + colorama.Cursor.DOWN(up)
-    return text
-
-
-def strip_ansi(text):
-    return RE_ANSIESCAPE.sub("", text)
-
-
-def len_ansi(text):
-    """Returns length after removing ANSI codes."""
-    return len(strip_ansi(text))
 
 
 def print_fixedwidth(*values, width=7, out=None, pbar=None, end="\n"):
@@ -242,7 +177,7 @@ def read_pairs(params, use_cache=False):
 
         # Extract g2 histogram and other data
         data = g2.g2_extr(
-            "/tmp/quick_timestamp",
+            params.outfile_path,
             channel_start=channel_start,
             channel_stop=channel_stop,
             highres_tscard=True,
@@ -287,12 +222,9 @@ def print_pairs(params):
     """Pretty printed variant of 'read_pairs', showing pairs, acc, singles."""
     _, _, pairs, acc, s1, s2, _, _, _ = read_pairs(params)
     print_fixedwidth(
-        round(pairs, 1),
-        round(acc, 1),
-        int(s1),
-        int(s2),
+        round(pairs, 1), round(acc, 1), int(s1), int(s2),
         width=0,
-    )
+    )  # fmt: skip
 
 
 @_collect_as_script("pairs")
@@ -370,17 +302,11 @@ def monitor_pairs(params):
         if i == 0 or hist_verbosity > 1:
             i = 10
             print_fixedwidth(
-                "TIME",
-                "ITIME",
-                "PAIRS",
-                "ACC",
-                "SINGLE1",
-                "SINGLE2",
-                "EFF1",
-                "EFF2",
-                "EFF_AVG",
+                "TIME", "ITIME",
+                "PAIRS", "ACC", "SINGLE1", "SINGLE2",
+                "EFF1", "EFF2", "EFF_AVG",
                 out=logfile if not is_header_logged else None,
-            )
+            )  # fmt: skip
             is_header_logged = True
         i -= 1
 
@@ -429,14 +355,7 @@ def monitor_pairs(params):
                         round(100 * p / (s1 * s2) ** 0.5, 1), fg="red", style="bright"
                     ),
                 )
-                longterm_data = {
-                    "count": 0,
-                    "inttime": 0,
-                    "pairs": 0,
-                    "acc": 0,
-                    "s1": 0,
-                    "s2": 0,
-                }
+                longterm_data = {k: 0 for k in longterm_data.keys()}  # reset counts
 
             # Print if exists
             if prev:
@@ -580,6 +499,8 @@ def duplicate_args(args):
 
 
 def main():
+    global style
+
     # fmt: off
     def make_parser(help_verbosity: int = 1):
         adv = kochen.scriptutil.get_help_descriptor(help_verbosity >= 2)
@@ -606,8 +527,8 @@ def main():
             "--save", metavar="", is_write_out_config_file_arg=True,
             help=adv("Path to configuration file for saving, then immediately exit"))
         pgroup_display.add_argument(
-            "--color", action="store_true",
-            help=adv("Add preset color highlighting to text in stdout"))
+            "--no-color", action="store_true",
+            help=adv("Disable color highlighting for stdout text"))
 
         # Script-level arguments
         pgroup_global = parser.add_argument_group("script-specific configuration")
@@ -622,6 +543,9 @@ def main():
         pgroup_global.add_argument(
             "-H", "--histogram", action="count", default=0,
             help="[pairs] Enable histogram (-HH for continuous histogram)")
+        pgroup_global.add_argument(
+            "--averaging_time", "--atime", metavar="", type=float, default=0.0,
+            help=adv("[pairs] Auxiliary long-term integration time, in seconds"))
 
         # Device-level argument
         pgroup_device = parser.add_argument_group("device configuration")
@@ -662,9 +586,6 @@ def main():
             "-T", "--time", metavar="", type=float, default=1.0,
             help="Integration time for timestamp, in seconds")
         pgroup_data.add_argument(
-            "--averaging_time", "--atime", metavar="", type=float, default=0.0,
-            help=adv("Auxiliary long-term integration time, in seconds"))
-        pgroup_data.add_argument(
             "--darkcount_ch1", "--ch1", metavar="", type=float, default=0.0,
             help=adv("Dark count level for detector channel 1, in counts/second"))
         pgroup_data.add_argument(
@@ -700,9 +621,7 @@ def main():
     if args.quiet:
         sys.excepthook = lambda etype, e, tb: print()
 
-    # Disable color if not explicitly enabled
-    if not args.color or not COLORAMA_IMPORTED:
-        style = lambda text, *args, **kwargs: text  # noqa
+    style = get_style(not args.no_color)
 
     # Initialize timestamp
     timestamp = TimestampTDC2(
