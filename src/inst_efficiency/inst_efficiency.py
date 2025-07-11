@@ -64,6 +64,7 @@ Examples:
        ./inst_efficiency.py pairs -c asympair --time 3
 """
 
+import dataclasses
 import datetime as dt
 import sys
 from copy import deepcopy
@@ -116,6 +117,38 @@ def print_fixedwidth(*values, width=7, out=None, pbar=None, end="\n"):
         )
         with open(out, "a") as f:
             f.write(line + "\n")
+
+
+@dataclasses.dataclass(frozen=True)
+class InstEfficiencyArgs:
+    device: str = "/dev/ioboards/usbtmst0"
+    readevents: str = "/usr/bin/readevents7"
+    tmpfile: str = "/tmp/quick_timestamp"
+    threshvolt: float = -0.4
+    fast: bool = False
+
+    script: str = "read_singles"
+    time: float = 1.0
+    accumulate: bool = False
+    darkcount1: float = 0.0
+    darkcount2: float = 0.0
+    darkcount3: float = 0.0
+    darkcount4: float = 0.0
+
+    average: bool = False
+
+    histogram: int = 0
+    width: float = 1
+    bins: int = 500
+    peak: int = -250
+    left: int = 0
+    right: int = 0
+    avgtime: float = 0.0
+    ch_start: int = 1
+    ch_stop: int = 4
+
+    def replace(self, *args, **kwargs):
+        return dataclasses.replace(self, *args, **kwargs)
 
 
 #############
@@ -654,7 +687,16 @@ def main():
         sys.excepthook = lambda etype, e, tb: print()
 
     style = get_style(not args.no_color)
+    args = postprocess_args(args)
 
+    # Call script
+    try:
+        return PROGRAMS[args.script](args)
+    except KeyboardInterrupt:
+        pass
+
+
+def postprocess_args(args):
     # Initialize timestamp
     timestamp = TimestampTDC2(
         device_path=args.device,
@@ -674,12 +716,7 @@ def main():
             args.darkcount4,
         ]
     )
-
-    # Call script
-    try:
-        PROGRAMS[args.script](args)
-    except KeyboardInterrupt:
-        pass
+    return args
 
 
 if __name__ == "__main__":
