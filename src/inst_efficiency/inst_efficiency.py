@@ -139,6 +139,81 @@ def _collect_as_script(alias=None):
     return collector
 
 
+def read_singles(params):
+    # Unpack arguments into aliases
+    duration = params.time
+    while True:
+        # Invoke timestamp data recording
+        data = params.timestamp.get_counts(
+            duration=duration,
+            return_actual_duration=True,
+        )
+        counts = np.array(data[:4])
+        inttime = data[4]
+
+        # Rough integration time check
+        if not (0.75 < inttime / duration < 2):
+            continue
+        if any(counts < 0):
+            continue
+        counts = counts / inttime - params.darkcounts
+        if params.accumulate:
+            counts = counts * inttime
+
+        # Single datapoint collection completed
+        break
+
+    return inttime, counts
+
+
+@_collect_as_script("singles_once")
+def print_singles(params):
+    """Pretty printed variant of 'read_singles'."""
+    inttime, counts = read_singles(params)
+    print_fixedwidth(
+        *list(map(round, counts)),
+        width=0,
+    )  # fmt: skip
+
+
+@_collect_as_script("singles")
+def monitor_singles(params):
+    """Prints out singles statistics."""
+    # Unpack arguments into aliases
+    logfile = params.logging
+    is_header_logged = False
+    i = 0
+    avg = np.array([0, 0, 0, 0])  # averaging facility, e.g. for measuring dark counts
+    avg_iters = 0
+    while True:
+        inttime, counts = read_singles(params)
+
+        # Implement rolling average to avoid overflow
+        if params.average:
+            avg_iters += 1
+            avg = (avg_iters - 1) / avg_iters * avg + np.array(counts) / avg_iters
+            counts = np.round(avg, 1)
+
+        # Print the header line after every 10 lines
+        if i == 0:
+            i = 10
+            print_fixedwidth(
+                "TIME", "INTTIME", "CH1", "CH2", "CH3", "CH4", "TOTAL",
+                out=logfile if not is_header_logged else None,
+            )  # fmt: skip
+            is_header_logged = True
+        i -= 1
+
+        # Print statistics
+        print_fixedwidth(
+            style(dt.datetime.now().strftime("%H%M%S"), style="dim"),
+            f"{inttime:.2f}",
+            *list(map(int, counts)),
+            style(int(sum(counts)), style="bright"),
+            out=logfile,
+        )
+
+
 def read_pairs(params, use_cache=False):
     """Compute single pass pair statistics.
 
@@ -367,61 +442,6 @@ def monitor_pairs(params):
                 print_fixedwidth(*prev, end="\r")
 
 
-@_collect_as_script("singles")
-def monitor_singles(params):
-    """Prints out singles statistics."""
-    # Unpack arguments into aliases
-    duration = params.time
-    logfile = params.logging
-
-    is_header_logged = False
-    i = 0
-    avg = np.array([0, 0, 0, 0])  # averaging facility, e.g. for measuring dark counts
-    avg_iters = 0
-    while True:
-        # Invoke timestamp data recording
-        data = params.timestamp.get_counts(
-            duration=duration,
-            return_actual_duration=True,
-        )
-        counts = np.array(data[:4])
-        inttime = data[4]
-
-        # Rough integration time check
-        if not (0.75 < inttime / duration < 2):
-            continue
-        if any(counts < 0):
-            continue
-        counts = counts / inttime - params.darkcounts
-        if params.accumulate:
-            counts = counts * inttime
-
-        # Implement rolling average to avoid overflow
-        if params.average:
-            avg_iters += 1
-            avg = (avg_iters - 1) / avg_iters * avg + np.array(counts) / avg_iters
-            counts = np.round(avg, 1)
-
-        # Print the header line after every 10 lines
-        if i == 0:
-            i = 10
-            print_fixedwidth(
-                "TIME", "INTTIME", "CH1", "CH2", "CH3", "CH4", "TOTAL",
-                out=logfile if not is_header_logged else None,
-            )  # fmt: skip
-            is_header_logged = True
-        i -= 1
-
-        # Print statistics
-        print_fixedwidth(
-            style(dt.datetime.now().strftime("%H%M%S"), style="dim"),
-            f"{inttime:.2f}",
-            *list(map(int, counts)),
-            style(int(sum(counts)), style="bright"),
-            out=logfile,
-        )
-
-
 def read_2pairs(params):
     """Prints out pair source statistics, between ch1 and ch4."""
     # Hardcoded hohoho
@@ -446,13 +466,6 @@ def read_2pairs(params):
     vars(_params).update(override2_params)
     _, _, p2, a2, s21, s22, *_ = read_pairs(_params, use_cache=True)
     return p1, a1, s11, s12, p2, a2, s21, s22
-
-
-@_collect_as_script("visibility")
-def print_2pairs(params):
-    """Pretty printed variant of 'read_pairs', showing pairs, acc, singles."""
-    p1, a1, s11, s12, p2, a2, s21, s22 = read_2pairs(params)
-    print(f"{p1} {p2} {a1} {a2}")
 
 
 @_collect_as_script("2pairs")
@@ -489,6 +502,13 @@ def monitor_2pairs(params):
             int(s22),
             out=logfile,
         )
+
+
+@_collect_as_script("visibility")
+def print_2pairs(params):
+    """Pretty printed variant of 'read_pairs', showing pairs, acc, singles."""
+    p1, a1, s11, s12, p2, a2, s21, s22 = read_2pairs(params)
+    print(f"{p1} {p2} {a1} {a2}")
 
 
 ##########################
@@ -556,7 +576,8 @@ def main():
         # Script-level arguments
         pgroup = parser.add_argument_group("global configuration")
         pgroup.add_argument(
-            "script", choices=PROGRAMS)
+            "script", nargs="?", metavar="subprogram", choices=PROGRAMS,
+            help="Required. Specifies the subprogram to run.")
         pgroup.add_argument(
             "-T", "--time", metavar="", type=float, default=1.0,
             help="Integration time for timestamp, in s (default: 1.0)")
@@ -622,6 +643,11 @@ def main():
     kochen.logging.set_default_handlers(logger, file=args.logging, **kwargs)
     kochen.logging.set_logging_level(logger, args.verbosity)
     logger.debug("%s", args)
+
+    if args.script is None:
+        parser.print_usage()
+        print(f"Specify which subprogram to run, i.e. {list(PROGRAMS.keys())}")
+        sys.exit(1)
 
     # Silence all errors/tracebacks
     if args.quiet:
