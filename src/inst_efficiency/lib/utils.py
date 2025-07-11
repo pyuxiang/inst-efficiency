@@ -79,3 +79,25 @@ def read_log(filename: str, schema: list, merge: bool = False):
     _data = np.array(list(zip(*_data)))  # type: ignore
     _items = tuple(zip(_headers, _data))  # type: ignore
     return dict(_items)
+
+
+"""
+Example code to manually read with 'configparser':
+
+# allow_unnamed_section=True from Python 3.13
+config = configparser.ConfigParser(
+    delimiters=("=",":"),
+    allow_no_value=False,
+    comment_prefixes=("#",";"),
+    inline_comment_prefixes=("#",";"),
+    strict=True,
+    empty_lines_in_values=False,
+)
+
+config_file = "inst-efficiency.default.conf"
+if pathlib.Path(config_file).exists():
+    with open(config_file) as f:
+        data = "[default]\n" + f.read()
+    config.read_string(data)
+    data = dict(config["default"].items())
+"""

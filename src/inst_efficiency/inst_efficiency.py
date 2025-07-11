@@ -127,7 +127,7 @@ class InstEfficiencyArgs:
     threshvolt: float = -0.4
     fast: bool = False
 
-    script: str = "read_singles"
+    script: str = None
     time: float = 1.0
     accumulate: bool = False
     darkcount1: float = 0.0
@@ -170,6 +170,49 @@ def _collect_as_script(alias=None):
         return f
 
     return collector
+
+
+@_collect_as_script("service")
+def run_service(args):
+    from kochen.ipcutil import Server
+
+    port = 4440
+    s = Server(port=port, secret=1)  # hardcoded port for now
+
+    def singles():
+        return read_singles(args)
+
+    def pairs():
+        return read_pairs(args)
+
+    s.register(singles)
+    s.register(pairs)
+
+    def get_ip_address():
+        # Copied from <https://stackoverflow.com/a/28950776>
+        import socket
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        try:
+            s.connect(("10.254.254.254", 1))  # does not need to be reachable
+            ip = s.getsockname()[0]
+        except:  # noqa: E722
+            ip = "127.0.0.1"
+        finally:
+            s.close()
+        return ip
+
+    ip = get_ip_address()
+    print(
+        "Starting service...\n"
+        "Available subprograms: 'singles', 'pairs' (example usage below)\n"
+        "\n"
+        "from kochen.ipcutil import Client\n"
+        f'c = Client("{ip}", port={port})\n'
+        'result = c.call("singles")\n'
+    )
+    s.run()
 
 
 def read_singles(params):
