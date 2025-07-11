@@ -24,7 +24,7 @@ Examples:
            -U /dev/ioboards/usbtmst1 \
            -S /home/sfifteen/programs/usbtmst4/apps/readevents7 \
            --threshvolt 1 \
-           --integration_time 2
+           --time 2
 
 
     3. Search for pairs between detector channels 1 and 2, over +/-250ns,
@@ -58,9 +58,9 @@ Examples:
 
        > cat ./asympair
        peak = 118
-       integration_time = 2
+       time = 2
 
-       # Output yields 'bins=10', 'peak=118', 'integration_time=3'
+       # Output yields 'bins=10', 'peak=118', 'time=3'
        ./inst_efficiency.py pairs -c asympair --time 3
 """
 
@@ -220,7 +220,7 @@ def read_pairs(params, use_cache=False):
     peak = params.peak
     roffset = params.window_right_offset
     loffset = params.window_left_offset
-    duration = params.integration_time
+    duration = params.time
     darkcounts = [
         params.darkcount_ch1,
         params.darkcount_ch2,
@@ -448,7 +448,7 @@ def monitor_pairs(params):
 def monitor_singles(params):
     """Prints out singles statistics."""
     # Unpack arguments into aliases
-    duration = params.integration_time
+    duration = params.time
     logfile = params.logging
 
     is_header_logged = False
@@ -663,7 +663,7 @@ def main():
             "--window_right_offset", "--right", metavar="", type=int, default=0,
             help="Right boundary of coincidence window relative to window middle")
         pgroup_data.add_argument(
-            "-T", "--integration_time", "--time", metavar="", type=float, default=1.0,
+            "-T", "--time", metavar="", type=float, default=1.0,
             help="Integration time for timestamp, in seconds")
         pgroup_data.add_argument(
             "--averaging_time", "--atime", metavar="", type=float, default=0.0,
