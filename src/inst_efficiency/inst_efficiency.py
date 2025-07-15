@@ -176,42 +176,24 @@ def _collect_as_script(alias=None):
 def run_service(args):
     from kochen.ipcutil import Server
 
-    port = 4440
-    s = Server(port=port, secret=1)  # hardcoded port for now
+    s = Server(address=args.ip, port=args.port, secret=args.secret)
 
     def singles():
-        return read_singles(args)
+        """Returns singles stats: (inttime, s1, s2, s3, s4)"""
+        inttime, counts = read_singles(args)
+        inttime = float(inttime)
+        counts = tuple(map(float, counts))
+        return (inttime, *counts)
 
     def pairs():
-        return read_pairs(args)
+        """Returns pair stats: (inttime, pairs, acc, s1, s2, e1, e2, eavg)"""
+        data = read_pairs(args)
+        data = tuple(map(float, data[1:]))  # remove histogram
+        return data
 
     s.register(singles)
     s.register(pairs)
-
-    def get_ip_address():
-        # Copied from <https://stackoverflow.com/a/28950776>
-        import socket
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.settimeout(0)
-        try:
-            s.connect(("10.254.254.254", 1))  # does not need to be reachable
-            ip = s.getsockname()[0]
-        except:  # noqa: E722
-            ip = "127.0.0.1"
-        finally:
-            s.close()
-        return ip
-
-    ip = get_ip_address()
-    print(
-        "Starting service...\n"
-        "Available subprograms: 'singles', 'pairs' (example usage below)\n"
-        "\n"
-        "from kochen.ipcutil import Client\n"
-        f'c = Client("{ip}", port={port})\n'
-        'result = c.call("singles")\n'
-    )
+    s.help()
     s.run()
 
 
@@ -707,6 +689,16 @@ def main():
             "--ch_stop", "--stop", metavar="", type=int, default=4,
             help=adv("Target timestamp channel for calculating time delay offset"))
 
+        pgroup = parser.add_argument_group("[service] options")
+        pgroup.add_argument(
+            "--ip", metavar="", default="0.0.0.0",
+            help=adv("Specify IP address for service mode (default: '0.0.0.0')"))
+        pgroup.add_argument(
+            "--port", metavar="", type=int, default=4440,
+            help=adv("Specify port number for service mode (default: 4440)"))
+        pgroup.add_argument(
+            "--secret", metavar="",
+            help=adv("Specify symmetric secret for authentication (default: None)"))
         return parser
     # fmt: on
 
