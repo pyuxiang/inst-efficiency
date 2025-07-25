@@ -176,8 +176,6 @@ def _collect_as_script(alias=None):
 def run_service(args):
     from kochen.ipcutil import Server
 
-    s = Server(address=args.ip, port=args.port, secret=args.secret)
-
     def singles():
         """Returns singles stats: (inttime, s1, s2, s3, s4)"""
         inttime, counts = read_singles(args)
@@ -191,9 +189,7 @@ def run_service(args):
         data = tuple(map(float, data[1:]))  # remove histogram
         return data
 
-    s.register(singles)
-    s.register(pairs)
-    s.get_help_server()
+    s = Server(singles, pairs, address=args.ip, port=args.port, secret=args.secret)
     s.run()
 
 
