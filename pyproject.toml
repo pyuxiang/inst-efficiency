@@ -18,7 +18,7 @@ dependencies = [
     "s15lib @ {root:uri}/src/inst_efficiency/lib/pyS15",
     "tqdm>=4.66.5",
     "fpfind @ git+https://github.com/s-fifteen-instruments/fpfind.git",
-    "kochen @ git+https://github.com/pyuxiang/kochen.git@main",
+    "kochen",
 ]
 
 [dependency-groups]
