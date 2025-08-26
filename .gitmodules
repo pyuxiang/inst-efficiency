@@ -1,3 +1,0 @@
-[submodule "src/inst_efficiency/lib/pyS15"]
-	path = src/inst_efficiency/lib/pyS15
-	url = https://github.com/s-fifteen-instruments/pyS15.git

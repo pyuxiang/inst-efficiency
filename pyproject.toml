@@ -15,9 +15,9 @@ dependencies = [
     "colorama>=0.4.6",
     "configargparse>=1.7",
     "numpy>=1.24.4",
-    "s15lib @ {root:uri}/src/inst_efficiency/lib/pyS15",
+    "s15lib @ git+https://github.com/s-fifteen-instruments/pyS15@ignore_rollover",
     "tqdm>=4.66.5",
-    "fpfind @ git+https://github.com/s-fifteen-instruments/fpfind.git",
+    "fpfind @ git+https://github.com/s-fifteen-instruments/fpfind",
     "kochen",
 ]
 

@@ -75,7 +75,7 @@ from S15lib.instruments import TimestampTDC2
 import kochen.scriptutil
 import kochen.logging
 
-import inst_efficiency.lib.g2lib as g2
+import S15lib.g2lib.g2lib as g2
 from inst_efficiency.lib.color import nostyle as style, get_style, len_ansi, strip_ansi
 
 logger = kochen.logging.get_logger(__name__)
@@ -205,6 +205,7 @@ def read_singles(params):
         data = params.timestamp.get_counts(
             duration=duration,
             return_actual_duration=True,
+            ignore_rollover=True,
         )
         counts = np.array(data[:4])
         inttime = data[4]
