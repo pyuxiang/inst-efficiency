@@ -127,7 +127,7 @@ class InstEfficiencyArgs:
     threshvolt: float = -0.4
     fast: bool = False
 
-    script: str = None
+    script: str | None = None
     time: float = 1.0
     accumulate: bool = False
     darkcount1: float = 0.0
@@ -193,7 +193,7 @@ def run_service(args):
 
     s.register(singles)
     s.register(pairs)
-    s.help()
+    s.get_help_server()
     s.run()
 
 
@@ -322,7 +322,7 @@ def read_pairs(params, use_cache=False):
         )
         hist = data[0]
         s1, s2 = data[2:4]
-        inttime = data[4] * 1e-9  # convert to units of seconds
+        inttime: float = data[4] * 1e-9  # convert to units of seconds
 
         # Integration time check for data validity
         if not (0.75 < inttime / duration < 2):
@@ -380,7 +380,11 @@ def monitor_pairs(params):
     i = 0
     is_initialized = False
     prev = None
-    longterm_data = {"count": 0, "inttime": 0, "pairs": 0, "acc": 0, "s1": 0, "s2": 0}
+
+    def get_longterm_datastruct():
+        return {"count": 0, "inttime": 0.0, "pairs": 0, "acc": 0, "s1": 0, "s2": 0}
+
+    longterm_data = get_longterm_datastruct()
     while True:
         hist, inttime, pairs, acc, s1, s2, e1, e2, eavg = read_pairs(params)
 
@@ -494,7 +498,7 @@ def monitor_pairs(params):
                         round(100 * p / (s1 * s2) ** 0.5, 1), fg="red", style="bright"
                     ),
                 )
-                longterm_data = {k: 0 for k in longterm_data.keys()}  # reset counts
+                longterm_data = get_longterm_datastruct()  # reset counts
 
             # Print if exists
             if prev:
