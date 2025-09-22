@@ -13,6 +13,10 @@ make usbtmst4
 pip install .
 ```
 
+Kernel headers are also needed to build the kernel module:
+
+* openSUSE: `zypper in kernel-devel`
+
 This exposes the `inst-efficiency` tool on the command line. Some common usage:
 
 ```bash
