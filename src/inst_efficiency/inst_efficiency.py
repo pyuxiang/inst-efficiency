@@ -140,7 +140,7 @@ class InstEfficiencyArgs:
     histogram: int = 0
     width: float = 1
     bins: int = 500
-    peak: int = -250
+    peak: float = -250
     left: int = 0
     right: int = 0
     avgtime: float = 0.0
@@ -314,7 +314,7 @@ def read_pairs(params, use_cache=False):
             bin_width=bin_width,
             bins=bins,
             # Include window at position 1
-            min_range=peak + loffset - 1,
+            min_range=bin_width * (loffset - 1) + peak,
         )
         hist = data[0]
         s1, s2 = data[2:4]
@@ -369,6 +369,7 @@ def monitor_pairs(params):
     peak = params.peak
     roffset = params.right
     loffset = params.left
+    width = params.width
     hist_verbosity = params.histogram
     logfile = params.logging
 
@@ -397,8 +398,8 @@ def monitor_pairs(params):
                     print_fixedwidth(*row)
             peakvalue = max(a)
             peakargmax = np.argmax(a)
-            peakpos = peakargmax + peak + loffset - 1
-            print(f"Maximum {peakvalue} @ index {peakpos}")
+            peakpos = width * (peakargmax + loffset - 1) + peak
+            print(f"Maximum {peakvalue} @ dt = {peakpos}")
 
             # Display current window as well
             window_size = roffset - loffset + 1
@@ -672,14 +673,14 @@ def main():
             "-B", "--bins", metavar="", type=int, default=500,
             help="Number of coincidence time bins, in units of 'width'")
         pgroup.add_argument(
-            "--peak", metavar="", type=int, default=-250,
-            help="Absolute bin position of coincidence window, in units of 'width'")
+            "--peak", metavar="", type=float, default=-250,
+            help="Center of coincidence window, in ns")
         pgroup.add_argument(
             "--left", metavar="", type=int, default=0,
-            help="Left offset of coincidence window relative to peak")
+            help="Left offset of coincidence window relative to peak, in units of 'width'")
         pgroup.add_argument(
             "--right", metavar="", type=int, default=0,
-            help="Right offset of coincidence window relative to peak")
+            help="Right offset of coincidence window relative to peak, in units of 'width'")
         pgroup.add_argument(
             "--avgtime", metavar="", type=float, default=0.0,
             help=adv("Auxiliary long-term integration time, in seconds"))
