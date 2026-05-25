@@ -39,3 +39,8 @@ distance-dirty = "v{base_version}"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.ruff.lint.per-file-ignores]
+"src/inst_efficiency/tdc1_utils.py" = [
+    "PLR0913",  # too many arguments: temporary refactor
+]

@@ -69,14 +69,15 @@ import datetime as dt
 import sys
 from copy import deepcopy
 
+import kochen.logging
+import kochen.scriptutil
 import numpy as np
+import S15lib.g2lib.g2lib as g2
 from S15lib.instruments import TimestampTDC2
 
-import kochen.scriptutil
-import kochen.logging
-
-import S15lib.g2lib.g2lib as g2
-from inst_efficiency.lib.color import nostyle as style, get_style, len_ansi, strip_ansi
+from inst_efficiency import tdc1_utils
+from inst_efficiency.lib.color import get_style, len_ansi, strip_ansi
+from inst_efficiency.lib.color import nostyle as style
 
 logger = kochen.logging.get_logger(__name__)
 
@@ -122,6 +123,7 @@ def print_fixedwidth(*values, width=7, out=None, pbar=None, end="\n"):
 @dataclasses.dataclass(frozen=True)
 class InstEfficiencyArgs:
     device: str = "/dev/ioboards/usbtmst0"
+    tdc1: bool = False
     readevents: str = "/usr/bin/readevents7"
     tmpfile: str = "/tmp/quick_timestamp"
     threshvolt: float = -0.4
@@ -198,13 +200,19 @@ def read_singles(params):
     duration = params.time
     while True:
         # Invoke timestamp data recording
-        data = params.timestamp.get_counts(
-            duration=duration,
-            return_actual_duration=True,
-            ignore_rollover=True,
-        )
-        counts = np.array(data[:4])
-        inttime = data[4]
+        if params.tdc1:
+            counts = params.timestamp.get_counts(duration)
+            counts = np.array(counts)
+            inttime = duration
+
+        else:
+            data = params.timestamp.get_counts(
+                duration=duration,
+                return_actual_duration=True,
+                ignore_rollover=True,
+            )
+            counts = np.array(data[:4])
+            inttime = data[4]
 
         # Rough integration time check
         if not (0.75 < inttime / duration < 2):
@@ -286,6 +294,7 @@ def read_pairs(params, use_cache=False):
     roffset = params.right
     loffset = params.left
     duration = params.time
+    min_range = bin_width * (loffset - 1) + peak  # include window at position 1
     darkcounts = [
         params.darkcount1,
         params.darkcount2,
@@ -302,20 +311,32 @@ def read_pairs(params, use_cache=False):
     acc_start = max(bins // 2, 1)  # location to compute accidentals
     while True:
         # Invoke timestamp data recording
-        if not use_cache:
-            timestamp._call_with_duration(["-a1", "-X"], duration=duration)
+        if params.tdc1:
+            data = tdc1_utils.g2_extr(
+                timestamp,
+                duration,
+                channel_start,
+                channel_stop,
+                min_range,
+                bins,
+                bin_width,
+            )
 
-        # Extract g2 histogram and other data
-        data = g2.g2_extr(
-            params.tmpfile,
-            channel_start=channel_start,
-            channel_stop=channel_stop,
-            highres_tscard=True,
-            bin_width=bin_width,
-            bins=bins,
-            # Include window at position 1
-            min_range=bin_width * (loffset - 1) + peak,
-        )
+        else:
+            if not use_cache:
+                timestamp._call_with_duration(["-a1", "-X"], duration=duration)
+
+            # Extract g2 histogram and other data
+            data = g2.g2_extr(
+                params.tmpfile,
+                channel_start=channel_start,
+                channel_stop=channel_stop,
+                highres_tscard=True,
+                bin_width=bin_width,
+                bins=bins,
+                min_range=min_range,
+            )
+
         hist = data[0]
         s1, s2 = data[2:4]
         inttime: float = data[4] * 1e-9  # convert to units of seconds
@@ -621,6 +642,9 @@ def main():
             "-U", "--device", metavar="", default="/dev/ioboards/usbtmst0",
             help="Path to timestamp device (default: '/dev/ioboards/usbtmst0')")
         pgroup.add_argument(
+            "--tdc1", action="store_true",
+            help=adv("Enable compatibility with TDC1 (default: TDC2)."))
+        pgroup.add_argument(
             "-S", "--readevents", metavar="", default="/usr/bin/readevents7",
             help=adv("Path to readevents binary (default: '/usr/bin/readevents7')"))
         pgroup.add_argument(
@@ -735,13 +759,20 @@ def main():
 
 def postprocess_args(args):
     # Initialize timestamp
-    timestamp = TimestampTDC2(
-        device_path=args.device,
-        readevents_path=args.readevents,
-        outfile_path=args.tmpfile,
-    )
-    timestamp.threshold = args.threshvolt
-    timestamp.fast = args.fast
+    if args.tdc1:
+        # Override for default TDC2 device path
+        if args.device == "/dev/ioboards/usbtmst0":
+            args.device = None
+        timestamp = tdc1_utils.load(args)
+
+    else:
+        timestamp = TimestampTDC2(
+            device_path=args.device,
+            readevents_path=args.readevents,
+            outfile_path=args.tmpfile,
+        )
+        timestamp.threshold = args.threshvolt
+        timestamp.fast = args.fast
 
     # Collect required arguments
     args.timestamp = timestamp
