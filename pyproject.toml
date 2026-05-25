@@ -44,3 +44,7 @@ allow-direct-references = true
 "src/inst_efficiency/tdc1_utils.py" = [
     "PLR0913",  # too many arguments: temporary refactor
 ]
+
+[tool.pyright]
+include = ["src"]
+typeCheckingMode = "standard"

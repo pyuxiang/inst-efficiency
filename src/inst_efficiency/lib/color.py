@@ -1,3 +1,7 @@
+# We ignore potentially undefined colorama, because this will not be
+# called upon import failure.
+# pyright: reportPossiblyUnboundVariable=false
+
 import re
 
 RE_ANSIESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")

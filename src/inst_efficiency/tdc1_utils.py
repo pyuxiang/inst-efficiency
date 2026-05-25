@@ -45,7 +45,7 @@ def load(args):
             message = b"\n\r\n".join(message.split(b"\n"))
             self._write(message, *args, **kwargs)
 
-        timestamp._com._write = timestamp._com.write
+        timestamp._com._write = timestamp._com.write  # pyright: ignore[reportAttributeAccessIssue]
         timestamp._com.write = types.MethodType(write, timestamp._com)
         timestamp._com.write(b"abort\r\n")  # terminate any existing streams
         timestamp._com.readlines()  # drain buffer
