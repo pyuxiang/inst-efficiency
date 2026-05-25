@@ -13,55 +13,59 @@ Changelog:
 
 Examples:
 
-    1. View available configuration options
+    1. View available configuration options:
 
-       ./inst_efficiency.py --help
+        inst-efficiency --help
 
 
-    2. TTL input pulses with 2s integration time
+    2. TTL input pulses with 2s integration time:
 
-       ./inst_efficiency.py singles \
-           -U /dev/ioboards/usbtmst1 \
-           -S /home/sfifteen/programs/usbtmst4/apps/readevents7 \
-           --threshvolt 1 \
-           --time 2
+        inst-efficiency singles \
+            -U /dev/ioboards/usbtmst1 \
+            -S /home/sfifteen/programs/usbtmst4/apps/readevents7 \
+            --threshvolt 1 \
+            --time 2
 
 
     3. Search for pairs between detector channels 1 and 2, over +/-250ns,
-       showing histogram of coincidences for each dataset
+       showing histogram of coincidences for each dataset:
 
-       ./inst_efficiency.py pairs -qH --ch_start 1 --ch_stop 2
+        inst-efficiency pairs -qH --ch_start 1 --ch_stop 2
 
 
     4. Calculate total pairs located at +118ns delay, within a 2ns-wide
-       coincidence window spanning +117ns to +118ns, with only 20 bins
+       coincidence window spanning +117ns to +118ns, with only 20 bins:
 
-       ./inst_efficiency.py pairs -q --peak 118 --left=-1 --right=0 --bins 20
-
-
-    5. Log measurements into a file
-
-       ./inst_efficiency.py pairs -q --logging pair_measurements
+        inst-efficiency pairs -q --peak 118 --left=-1 --right=0 --bins 20
 
 
-    6. Save configuration from (4) into default config file
+    5. Log measurements into a file:
 
-       ./inst_efficiency.py pairs -q --peak 118 -L=-1 -R 0 --bins 20 \
-           --save ./inst_efficiency.py.default.conf
+        inst-efficiency pairs -q --logging pair_measurements
+
+
+    6. Save configuration from (4) into default config file:
+
+        inst-efficiency pairs -q --peak 118 -L=-1 -R 0 --bins 20 \
+            --save ./inst-efficiency.default.conf
 
 
     7. Load multiple configuration
 
-       > cat ./inst_efficiency.py.default.conf
-       bins = 10
-       peak = 200
+        > cat ./inst-efficiency.default.conf
+        bins = 10
+        peak = 200
 
-       > cat ./asympair
-       peak = 118
-       time = 2
+        > cat ./asympair
+        peak = 118
+        time = 2
 
-       # Output yields 'bins=10', 'peak=118', 'time=3'
-       ./inst_efficiency.py pairs -c asympair --time 3
+        # Output yields 'bins=10', 'peak=118', 'time=3'
+        inst-efficiency pairs -c asympair --time 3
+
+    8. Runs a service for other processes to remotely query timestamp:
+
+        inst-efficiency service ...  # listens on *:4440/tcp
 """
 
 import dataclasses
