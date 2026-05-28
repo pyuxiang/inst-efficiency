@@ -62,15 +62,14 @@ def g2_extr(
     # Adapted from S15lib.g2lib.g2lib.g2_extr()
     t1 = t[(p & (1 << channel_start)).astype(bool)].astype(np.float64)
     t2 = t[(p & (1 << channel_stop)).astype(bool)].astype(np.float64)
-    if t1.size == 0 and t2.size == 0:
-        raise RuntimeError(
-            "No timestamp events recorded in channels "
-            f"{channel_start + 1} and {channel_stop + 1}."
-        )
-    hist = g2.delta_loop(t1, t2 - min_range, bins=bins, bin_width_ns=bin_width)
     t_max = 0
     if len(t) > 0:
         t_max = t[-1] - t[0]
+
+    if t1.size == 0 or t2.size == 0:
+        hist = np.zeros(bins)
+    else:
+        hist = g2.delta_loop(t1, t2 - min_range, bins=bins, bin_width_ns=bin_width)
     data = (hist, None, len(t1), len(t2), t_max)
     return data
 
